@@ -53,6 +53,7 @@ nobody needs to read that package's source for this.
 | 2026-09-28 | Specification | Claude (local) | PR #1 @ `e8f7ad8`, black-box against a real account; the 2.x code for the light-type fact | `ACCEPTANCE.md` (L1, L2); PROTOCOL A §3.7, §4.2 and §4.3 (the rate limit, success code 1), B §2.3.9 (the function names are compatibility data) | n/a — specification team |
 | 2026-09-28 | Implementation | Claude cloud session (round 2) | This repository: `docs/CLEAN-ROOM.md`, `docs/ACCEPTANCE.md`, the `origin/main` diff of `docs/PROTOCOL.md` (A §3.7, §4.2, §4.3; B §2.3.9), PROTOCOL B §5.4.7 and C §4.7, `README.md`, CI workflow, and the branch's own `src/` and `tests/`; `Nino6689/anycubic-lan` `src/anycubic_lan/reports.py` (its `Light`/`LightReport` parser) and the installed PyPI wheel's exports | L1 and L2 fixes in `client.py`, `mqtt.py`, `messages.py`; tests; `README.md` (reusing a sign-in's tokens, lights); the fix notes in `ACCEPTANCE.md`; this row | Yes |
 | 2026-09-28 | Specification | Claude (local) | PR #1 @ `e5df26f`, black-box against the live account | L1 and L2 confirmed on hardware; v0.1.0 accepted; similarity and secret scan unchanged | n/a — specification team |
+| 2026-09-28 | Specification | Claude (local) | Agora's `agora-rtc-sdk-ng` 4.24.0 npm package (to extract its public key); PR #2 run through the integration against the live account | PROTOCOL D §1.7 'Agora's key' with provenance; L3 confirmed live (the camera streams) | n/a — specification team |
 
 ## Similarity checks
 
