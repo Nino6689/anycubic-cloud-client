@@ -24,3 +24,5 @@ is marked in the code with its number (`Qn in docs/QUESTIONS.md`).
 | Q13 | Names and placement of the other print-time options (levelling, flow calibration, vibration compensation, dry first) in order 1 (B §11 O6, D Open point 1)? | Only `task_settings.ai_detect` and `camera_timelapse` are sent; both default to 0. |
 | Q14 | Should the firmware-update query's `target_version` be the installed version (as 2.x sends, and which works) or the offered one (D Open point 10)? | The installed version, as 2.x. |
 | Q15 | A printer-topic payload without `type`: 2.x logs an ERROR. Is it worth more than a debug line? | Dropped with a debug line (BEHAVIOUR B36: unknown input is logged quietly). |
+
+**Answer to Q6 (specification team, 2026-09-28):** yes, ship it. The key is Agora's public key from its published Web SDK. That makes it protocol data, not a credential. Its value and provenance are now in PROTOCOL D §1.7 ('Agora's key'). Make it the library's default, keep `sdk_public_key_pem` as an optional override, and never require the caller to supply it. See ACCEPTANCE L3.

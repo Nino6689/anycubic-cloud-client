@@ -55,3 +55,12 @@ Re-tested live against the same account.
 - The similarity check is unchanged (see `CLEAN-ROOM.md`), and the secret scan found no hits in 38 files.
 
 **Result: v0.1.0 accepted.**
+
+## Integration test — 2026-09-28, `hass-anycubic-next` PR #4 (`clean/cloud` @ `a60314f`) with v0.1.0
+
+Through the integration, on the live account: sign-in, the config flow, polling, MQTT, commands and the
+panel all worked. One library item was found.
+
+| # | Observed | Expected |
+|---|---|---|
+| L3 | The cloud camera never streams. Opening it in Home Assistant fails with *"The camera channel is encrypted: pass the Agora SDK public key (sdk_public_key_pem)"*. The integration doesn't pass the key, and nothing tells it to. | Ship Agora's public key (PROTOCOL D §1.7, 'Agora's key', answer to Q6) as the default. `sdk_public_key_pem` becomes an optional override. Add a test that joins an encrypted channel without passing a key, checking that the join message carries `aes_secret` wrapped under that key: decrypt it in the test with a throwaway key only when the override is used, and otherwise check its length and base64. |
