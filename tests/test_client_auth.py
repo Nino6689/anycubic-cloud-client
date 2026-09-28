@@ -22,6 +22,11 @@ from anycubic_cloud_client import (
     sign_in_any,
     sign_in_order,
 )
+from anycubic_cloud_client.client import (
+    MSG_RATE_LIMITED,
+    RATE_LIMIT_DELAY,
+    RATE_LIMIT_RETRIES,
+)
 from anycubic_cloud_client.signing import signature
 
 from .conftest import (
@@ -40,6 +45,7 @@ from .test_tokens import make_jwt
 EXCHANGE = "/v3/public/loginWithAccessToken"
 USER = "/user/profile/userInfo"
 EXPIRED_MSG = "Login information has expired. Please login again."
+RATE_LIMIT_MSG = "请求过于频繁。请稍后再试"  # PROTOCOL A §4.3
 
 
 def exchange_ok(token: str = "EXCHANGED") -> dict[str, Any]:
@@ -390,6 +396,126 @@ async def test_exchange_refused_without_fallback(
     assert info.value.reason is RejectReason.EXPIRED
 
 
+# -- the exchange rate limit (PROTOCOL A §3.7, §4.3; ACCEPTANCE L2) -----------------
+
+
+def rate_limited() -> dict[str, Any]:
+    return envelope(None, msg=RATE_LIMIT_MSG, code=0)
+
+
+async def test_rate_limit_waits_and_retries(
+    http: FakeSession,
+    secrets: CloudSecrets,
+    no_sleep: list[float],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """L2: a rate-limit answer is transient, not a refusal: wait, then retry."""
+    caplog.set_level(logging.DEBUG, logger="anycubic_cloud_client")
+    http.add("POST", EXCHANGE, rate_limited(), exchange_ok())
+    http.add("GET", USER, envelope(USER_INFO))
+    client = make_client(
+        http, secrets, user_token=None, access_token="secret-access-token"
+    )
+    await client.check()
+    assert no_sleep == [RATE_LIMIT_DELAY]
+    assert RATE_LIMIT_DELAY >= 5
+    assert MSG_RATE_LIMITED == RATE_LIMIT_MSG
+    assert len(http.calls_to(EXCHANGE)) == 2
+    assert client.auth_mode is AuthMode.SLICER
+    assert client.token_state.auth_token == "EXCHANGED"
+    assert client.token_state.auth_access_token == "secret-access-token"
+    assert RATE_LIMIT_MSG in caplog.text
+    assert "secret-access-token" not in caplog.text
+    assert "EXCHANGED" not in caplog.text
+
+
+async def test_rate_limit_delay_is_injectable(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    http.add("POST", EXCHANGE, rate_limited(), rate_limited(), exchange_ok())
+    http.add("GET", USER, envelope(USER_INFO))
+    client = AnycubicCloudClient.from_entry(
+        aiohttp_session(http),
+        secrets,
+        token="access",
+        auth_mode=AuthMode.SLICER,
+        rate_limit_delay=0,
+    )
+    assert client.rate_limit_delay == 0
+    await client.check()  # real (zero) sleeps
+    assert len(http.calls_to(EXCHANGE)) == 3
+    assert client.auth_mode is AuthMode.SLICER
+
+
+async def test_rate_limit_does_not_count_as_a_refusal(
+    http: FakeSession, secrets: CloudSecrets, no_sleep: list[float]
+) -> None:
+    http.add("POST", EXCHANGE, refused(), rate_limited(), exchange_ok())
+    http.add("GET", USER, envelope(USER_INFO))
+    client = make_client(
+        http, secrets, user_token=None, access_token="access", rate_limit_delay=7.5
+    )
+    await client.check()
+    assert no_sleep == [2.0, 7.5]
+    assert client.auth_mode is AuthMode.SLICER
+
+
+async def test_persistent_rate_limit_is_service_unavailable(
+    http: FakeSession, secrets: CloudSecrets, no_sleep: list[float]
+) -> None:
+    """Never the web fallback, never a credentials verdict."""
+    http.add("POST", EXCHANGE, rate_limited())
+    client = make_client(http, secrets, user_token=None, access_token="access")
+    with pytest.raises(ServiceUnavailableError) as info:
+        await client.check()
+    assert not isinstance(info.value, CredentialsRejectedError)
+    assert no_sleep == [RATE_LIMIT_DELAY] * RATE_LIMIT_RETRIES
+    assert len(http.calls_to(EXCHANGE)) == RATE_LIMIT_RETRIES + 1
+    assert http.calls_to(USER) == []
+    assert client.auth_mode is AuthMode.SLICER
+    assert not client.tokens_changed
+    assert client.token_state.auth_access_token == "access"
+
+
+async def test_rate_limit_after_a_refusal_skips_the_fallback(
+    http: FakeSession, secrets: CloudSecrets, no_sleep: list[float]
+) -> None:
+    http.add("POST", EXCHANGE, refused(), rate_limited())
+    client = make_client(http, secrets, user_token=None, access_token="access")
+    with pytest.raises(ServiceUnavailableError):
+        await client.check()
+    assert client.auth_mode is AuthMode.SLICER
+
+
+async def test_rate_limited_displaced_retry_is_service_unavailable(
+    http: FakeSession, secrets: CloudSecrets, no_sleep: list[float]
+) -> None:
+    """The re-exchange after a displaced user token is rate-limited too."""
+    http.add("GET", USER, refused())
+    http.add("POST", EXCHANGE, rate_limited())
+    client = make_client(http, secrets, user_token="old", access_token="access")
+    with pytest.raises(ServiceUnavailableError):
+        await client.check()
+
+
+async def test_refusal_log_names_the_server_message(
+    http: FakeSession,
+    secrets: CloudSecrets,
+    no_sleep: list[float],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.DEBUG, logger="anycubic_cloud_client")
+    http.add("POST", EXCHANGE, refused(EXPIRED_MSG))
+    client = make_client(
+        http, secrets, user_token=None, access_token="secret-access-token"
+    )
+    client._web_fallback_done = True
+    with pytest.raises(CredentialsRejectedError):
+        await client.check()
+    assert f"msg={EXPIRED_MSG}" in caplog.text
+    assert "secret-access-token" not in caplog.text
+
+
 @pytest.mark.parametrize("data", [None, {"id": None}, {"user_email": "x"}, "text"])
 async def test_user_info_rejections(
     http: FakeSession, secrets: CloudSecrets, data: Any
@@ -581,3 +707,50 @@ async def test_sign_in_any_stops_on_transport_error(
     with pytest.raises(ServiceUnavailableError):
         await sign_in_any(aiohttp_session(http), secrets, "opaque")
     assert len(http.calls) == 1
+
+
+async def test_sign_in_any_persistent_rate_limit(
+    http: FakeSession, secrets: CloudSecrets, no_sleep: list[float]
+) -> None:
+    """L2: no other mode is tried and no credentials verdict is given."""
+    http.add("POST", EXCHANGE, envelope(None, msg=RATE_LIMIT_MSG, code=0))
+    with pytest.raises(ServiceUnavailableError):
+        await sign_in_any(aiohttp_session(http), secrets, "eyJtoken.x.y")
+    assert http.calls_to(USER) == []
+
+
+async def test_sign_in_any_rate_limit_then_success(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    http.add(
+        "POST", EXCHANGE, envelope(None, msg=RATE_LIMIT_MSG, code=0), exchange_ok()
+    )
+    http.add("GET", USER, envelope(USER_INFO))
+    result = await sign_in_any(
+        aiohttp_session(http), secrets, "eyJtoken.x.y", rate_limit_delay=0
+    )
+    assert result.auth_mode is AuthMode.SLICER
+    assert result.client.rate_limit_delay == 0
+
+
+async def test_client_after_sign_in_reuses_its_tokens(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    """L2: a client set up straight after a sign-in does not exchange again."""
+    http.add("POST", EXCHANGE, exchange_ok())
+    http.add("GET", USER, envelope(USER_INFO))
+    token = "eyJtoken.x.y"
+    result = await sign_in_any(aiohttp_session(http), secrets, token)
+    assert len(http.calls_to(EXCHANGE)) == 1
+    client = AnycubicCloudClient.from_entry(
+        aiohttp_session(http),
+        secrets,
+        token=token,
+        auth_mode=result.auth_mode,
+        store=result.tokens,
+    )
+    assert client.token_state == result.tokens
+    await client.check()
+    assert len(http.calls_to(EXCHANGE)) == 1
+    assert http.calls_to(USER)[-1].headers["XX-Token"] == "EXCHANGED"
+    assert not client.tokens_changed

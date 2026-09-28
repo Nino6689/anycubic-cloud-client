@@ -94,6 +94,10 @@ DEFAULT_LIGHT_TYPE = 1
 #: Token exchange: 2 attempts, 2 s apart.
 EXCHANGE_ATTEMPTS = 2
 EXCHANGE_RETRY_DELAY = 2.0
+#: Token exchange rate limit (A §4.3): wait at least 5 s (10 s recommended)
+#: and try again, up to 3 more times, then report the cloud unavailable.
+RATE_LIMIT_DELAY = 10.0
+RATE_LIMIT_RETRIES = 3
 #: Start print: 3 attempts, 3 s after each ``No file found``.
 START_PRINT_ATTEMPTS = 3
 START_PRINT_RETRY_DELAY = 3.0
@@ -108,6 +112,10 @@ CLOUD_FILE_LIST_LIMIT = 10
 MSG_REQUEST_ERROR = "request error"
 MSG_NO_FILE_FOUND = "No file found"
 MSG_SESSION_EXPIRED = "Login information has expired. Please login again."
+#: The rate-limit refusal of the token exchange (A §4.3): "requests too
+#: frequent, try again later". Matched on its first clause.
+MSG_RATE_LIMITED = "请求过于频繁。请稍后再试"
+_RATE_LIMIT_MARK = "请求过于频繁"
 CODE_PRINTER_REMOVED = 1007
 
 PARSE_ERROR = "Unexpected error parsing Anycubic response, server maintenance?"
@@ -143,6 +151,10 @@ class PrintStartResult:
     mapping: tuple[SlotAssignment, ...] = ()
 
 
+def _rate_limited(message: str | None) -> bool:
+    return message is not None and _RATE_LIMIT_MARK in message
+
+
 def _reason(message: str | None) -> RejectReason:
     if message == MSG_SESSION_EXPIRED:
         return RejectReason.EXPIRED
@@ -170,6 +182,7 @@ class AnycubicCloudClient:
         device_id: str | None = None,
         debug_api_calls: bool = False,
         request_timeout: float | None = None,
+        rate_limit_delay: float = RATE_LIMIT_DELAY,
     ) -> None:
         if not isinstance(secrets, CloudSecrets):
             raise TypeError("secrets must be a CloudSecrets")
@@ -192,6 +205,8 @@ class AnycubicCloudClient:
         )
         self._last_slow_warning: float | None = None
         self._clock: Callable[[], float] = time.monotonic
+        #: Seconds to wait after a rate-limited token exchange (A §4.3).
+        self.rate_limit_delay = rate_limit_delay
         # Light types reported over MQTT, by printer key (B §5.4.7, C §4.7),
         # and the printer keys learned from the printer lists, by id.
         self._light_types: dict[str, set[int]] = {}
@@ -207,8 +222,9 @@ class AnycubicCloudClient:
         auth_mode: AuthMode | int | None,
         region: Region | str | None = None,
         device_id: str | None = None,
-        store: Mapping[str, Any] | None = None,
+        store: Mapping[str, Any] | TokenState | None = None,
         debug_api_calls: bool = False,
+        rate_limit_delay: float = RATE_LIMIT_DELAY,
     ) -> AnycubicCloudClient:
         """Build a client from a config entry (PROTOCOL A §2.6.5 steps 1-3).
 
@@ -216,6 +232,11 @@ class AnycubicCloudClient:
         user token starts empty; otherwise the pasted token is the user token.
         ``store``, when given, is overlaid with :meth:`apply_token_store`. To
         retry "from the entry alone" (step 6) build again without ``store``.
+
+        ``store`` may also be a :class:`TokenState`, such as
+        :attr:`SignInResult.tokens`: a client built straight after
+        :func:`sign_in_any` then reuses that sign-in's tokens instead of
+        exchanging the access token again (A §3.7).
         """
         mode = AuthMode.resolve(auth_mode)
         resolved_region = Region.resolve(region)
@@ -229,7 +250,10 @@ class AnycubicCloudClient:
             access_token=token if exchanges else None,
             device_id=device_id,
             debug_api_calls=debug_api_calls,
+            rate_limit_delay=rate_limit_delay,
         )
+        if isinstance(store, TokenState):
+            store = store.to_store()
         if store:
             client.apply_token_store(store)
         return client
@@ -432,11 +456,16 @@ class AnycubicCloudClient:
         )
 
     async def _exchange(self) -> str | None:
-        """Exchange the access token (A §2.6.3). Returns the failure ``msg``."""
+        """Exchange the access token (A §2.6.3). Returns the failure ``msg``.
+
+        A rate-limit answer (A §4.3) is not a refusal: it is retried after
+        :attr:`rate_limit_delay`, and raises :class:`ServiceUnavailableError`
+        when it persists. It never leads to the web fallback.
+        """
         message: str | None = None
-        for attempt in range(EXCHANGE_ATTEMPTS):
-            if attempt:
-                await asyncio.sleep(EXCHANGE_RETRY_DELAY)
+        refusals = 0
+        rate_limited = 0
+        while refusals < EXCHANGE_ATTEMPTS:
             response = await self.request(
                 "POST",
                 "/v3/public/loginWithAccessToken",
@@ -451,8 +480,32 @@ class AnycubicCloudClient:
             if isinstance(token, str) and token:
                 self._set_user_token(token)
                 return None
+            if _rate_limited(response.msg):
+                rate_limited += 1
+                _LOGGER.debug(
+                    "Token exchange rate-limited (%s); %s",
+                    response.msg,
+                    f"retrying in {self.rate_limit_delay:g} s"
+                    if rate_limited <= RATE_LIMIT_RETRIES
+                    else "giving up",
+                )
+                if rate_limited > RATE_LIMIT_RETRIES:
+                    raise ServiceUnavailableError(
+                        "The Anycubic cloud is rate-limiting the token exchange; "
+                        "try again later"
+                    )
+                await asyncio.sleep(self.rate_limit_delay)
+                continue
             message = response.msg
-            _LOGGER.debug("Token exchange refused (attempt %s)", attempt + 1)
+            refusals += 1
+            _LOGGER.debug(
+                "Token exchange refused (attempt %s): code=%s msg=%s",
+                refusals,
+                response.code,
+                message,
+            )
+            if refusals < EXCHANGE_ATTEMPTS:
+                await asyncio.sleep(EXCHANGE_RETRY_DELAY)
         if self._can_web_fallback():
             # PROTOCOL A §2.8: a web token taken for a slicer token.
             _LOGGER.debug("Retrying the pasted token as a web token")
@@ -1360,6 +1413,8 @@ class SignInResult:
     """The mode tried (what the entry saves), even if it fell back to web."""
     account: Account
     tokens: TokenState
+    """The tokens after sign-in: save ``tokens.to_store()``, or pass them as
+    ``store`` to :meth:`AnycubicCloudClient.from_entry` to reuse them."""
     client: AnycubicCloudClient = field(repr=False)
 
 
@@ -1370,13 +1425,19 @@ async def sign_in_any(
     *,
     device_id: str | None = None,
     region: Region | str | None = None,
+    rate_limit_delay: float = RATE_LIMIT_DELAY,
 ) -> SignInResult:
     """Try the modes in the order of PROTOCOL A §2.9, each with a new client.
 
     Raises :class:`CredentialsRejectedError` when every mode is refused, with
     reason ``WRONG_TOKEN_TYPE`` when the JWT's ``tokenType`` exists and is not
     ``access-token`` (not checked for China). Any other error (transport,
-    maintenance, unreadable answer) ends the attempt at once.
+    maintenance, unreadable answer, a persistent rate limit) ends the attempt
+    at once.
+
+    To set up a client right after, pass :attr:`SignInResult.tokens` as the
+    ``store`` of :meth:`AnycubicCloudClient.from_entry` (or keep using
+    :attr:`SignInResult.client`), so the access token is not exchanged again.
     """
     resolved = Region.resolve(region)
     last_error: CredentialsRejectedError | None = None
@@ -1388,6 +1449,7 @@ async def sign_in_any(
             auth_mode=mode,
             region=resolved,
             device_id=device_id,
+            rate_limit_delay=rate_limit_delay,
         )
         try:
             account = await client.check()

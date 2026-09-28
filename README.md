@@ -106,11 +106,42 @@ secrets = CloudSecrets(
 `CloudSecrets` is validated when it is built and its `repr` never shows a
 value. Tokens, signatures and secrets are never logged.
 
+### Setting up right after a sign-in
+
+The cloud refuses a second exchange of the same access token within a few
+seconds (a rate limit, PROTOCOL A §4.3). The client waits it out (10 s by
+default, `rate_limit_delay=` to change it) and raises
+`ServiceUnavailableError`, never a credentials error, if it persists. To
+avoid it altogether, reuse the tokens of the sign-in instead of exchanging
+again:
+
+```python
+result = await sign_in_any(session, secrets, pasted_token)
+stored = result.tokens.to_store()  # save this as the token store
+cloud = AnycubicCloudClient.from_entry(
+    session,
+    secrets,
+    token=pasted_token,
+    auth_mode=result.auth_mode,
+    store=result.tokens,  # a TokenState or a saved store dict
+)
+await cloud.check()  # userInfo only: no second exchange
+```
+
+### Lights
+
+`set_light(printer_id, on)` sends the light type the printer reported over
+the cloud MQTT link (the lowest one), and 1 only when none has been reported
+yet (PROTOCOL B §5.4.7). The link records the types as `light` messages
+arrive; the printer id is tied to its key by `get_printers()` or
+`get_printer()`. To restore types remembered across a restart, call
+`cloud.note_light_types(printer_key, types)`. An explicit `light_type=` wins.
+
 ## What is supported
 
 - **Sign-in** in the three modes (web, Android, slicer) and both regions
-  (international, China): the token exchange with its retry, the web
-  fallback, the displaced-token retry, `sign_in_any()` for a config flow, the
+  (international, China): the token exchange with its retry and its
+  rate-limit cooldown, the web fallback, the displaced-token retry, `sign_in_any()` for a config flow, the
   2.x token-store format in and out, and token helpers (extraction from
   pasted text or a Slicer Next config file, unverified claims, the RS256
   pre-check against the JWKS with signature trimming).
