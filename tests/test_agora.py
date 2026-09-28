@@ -124,14 +124,32 @@ def test_encryption_fields(sdk_key: rsa.RSAPrivateKey) -> None:
     assert "aespassword" not in fields
 
 
+def assert_wrapped_under_agoras_key(secret: object) -> None:
+    """An RSA-OAEP ciphertext under a 1024-bit key is exactly 128 bytes."""
+    assert isinstance(secret, str)
+    assert len(base64.b64decode(secret, validate=True)) == 128
+
+
+def test_agoras_key_is_the_default() -> None:
+    # L3: an encrypted channel needs no key from the caller (Q6).
+    key = serialization.load_der_public_key(
+        base64.b64decode(agora_module.AGORA_SDK_PUBLIC_KEY)
+    )
+    assert isinstance(key, rsa.RSAPublicKey)
+    assert key.key_size == 1024
+    fields = encryption_fields(credentials())
+    assert list(fields) == ["aes_mode", "aes_secret", "aes_encrypt", "aes_salt"]
+    assert fields["aes_encrypt"] is True
+    assert_wrapped_under_agoras_key(fields["aes_secret"])
+    assert_wrapped_under_agoras_key(wrap_channel_secret("k"))
+
+
 def test_open_channel_has_no_encryption_fields() -> None:
     assert encryption_fields(credentials(encryption_mode="none"), None) == {}
     assert encryption_fields(credentials(encryption_mode=""), None) == {}
 
 
 def test_encryption_errors(sdk_key: rsa.RSAPrivateKey) -> None:
-    with pytest.raises(AgoraError, match="SDK public key"):
-        encryption_fields(credentials(), None)
     with pytest.raises(AgoraError, match="key or salt"):
         encryption_fields(credentials(encryption_key=""), pem(sdk_key))
     with pytest.raises(AgoraError, match="not base64"):
@@ -777,9 +795,8 @@ async def test_offer_without_media(http: FakeSession) -> None:
     assert http.calls == []
 
 
-async def test_encrypted_join_carries_the_four_fields(
-    http: FakeSession, quick: None, sdk_key: rsa.RSAPrivateKey
-) -> None:
+async def encrypted_join(http: FakeSession, **kwargs: Any) -> dict[str, Any]:
+    """Join an encrypted channel through the fakes; return the join message."""
     sockets: list[FakeWS] = []
 
     def factory(url: str) -> FakeWS:
@@ -796,15 +813,36 @@ async def test_encrypted_join_carries_the_four_fields(
         OFFER,
         "s",
         candidates=["candidate:1 1 udp 5 192.0.2.1 9 typ host"],
-        sdk_public_key_pem=pem(sdk_key),
+        **kwargs,
     )
     assert answer
-    body = sockets[0].sent[0]["_message"]
+    await session.close()
+    body: dict[str, Any] = sockets[0].sent[0]["_message"]
     assert body["aes_mode"] == "aes-256-gcm2"
     assert body["aes_encrypt"] is True
-    assert "aes_secret" in body
-    assert "aes_salt" in body
-    await session.close()
+    assert body["aes_salt"] == CAMERA_REPLY["data"]["shengwang"]["encryption_kdf_salt"]
+    return body
+
+
+async def test_encrypted_join_without_a_key_uses_agoras(
+    http: FakeSession, quick: None
+) -> None:
+    # L3: no sdk_public_key_pem passed, and the join still goes out.
+    body = await encrypted_join(http)
+    assert_wrapped_under_agoras_key(body["aes_secret"])
+
+
+async def test_encrypted_join_with_an_overriding_key(
+    http: FakeSession, quick: None, sdk_key: rsa.RSAPrivateKey
+) -> None:
+    body = await encrypted_join(http, sdk_public_key_pem=pem(sdk_key))
+    plain = sdk_key.decrypt(
+        base64.b64decode(body["aes_secret"]),
+        padding.OAEP(
+            mgf=padding.MGF1(hashes.SHA256()), algorithm=hashes.SHA256(), label=None
+        ),
+    )
+    assert plain == credentials().encryption_key.encode()  # raw UTF-8
 
 
 async def test_message_loop_socket_error(http: FakeSession, quick: None) -> None:

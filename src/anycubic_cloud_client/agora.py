@@ -95,6 +95,15 @@ EDGE_CONNECT_TIMEOUT = 10.0
 JOIN_TIMEOUT = 15.0
 VIDEO_STREAM_WAIT = 8.0
 PING_INTERVAL = 3.0
+#: Agora's own public key from its Web SDK: ``agora-rtc-sdk-ng`` 4.24.0 imports
+#: it as SPKI for RSA-OAEP to wrap the channel key (PROTOCOL D §1.7, "Agora's
+#: key"; Q6 in docs/QUESTIONS.md). Public protocol data, not an Anycubic
+#: credential. SPKI, DER, base64; ``sdk_public_key_pem`` overrides it.
+AGORA_SDK_PUBLIC_KEY = (
+    "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDCMnXAHkKIGAM+x4N22gCI+WyuSTM9ztkT"
+    "3uYslTT2PuKmZfPzhH6kVdO7PTjGCOZnAsyb3oTtWat0KcxQ4jxvqQV+HvYl3iI1Yd4vl2c3"
+    "qRMJPLtRDfNxa2Mcxgq7e9aEUibzdd0st+OJAy3tOj/Y0aVyxQiYDz3vqa6bP29adwIDAQAB"
+)
 #: Gateway errors worth naming.
 ERROR_ILLEGAL_AES_PASSWORD = 2028
 ERROR_INVALID_REJOIN_TOKEN = 2024
@@ -112,12 +121,23 @@ class _SessionEnded(AgoraError):
 # --------------------------------------------------------------------------
 
 
-def wrap_channel_secret(encryption_key: str, sdk_public_key_pem: bytes) -> str:
+def wrap_channel_secret(
+    encryption_key: str, sdk_public_key_pem: bytes | None = None
+) -> str:
     """``aes_secret``: the channel key's raw UTF-8 bytes (never hex-decoded)
     encrypted with RSA-OAEP (SHA-256, MGF1-SHA-256, no label) under the SDK's
-    public key, base64-encoded."""
+    public key, base64-encoded.
+
+    The key is Agora's (:data:`AGORA_SDK_PUBLIC_KEY`) unless a PEM override is
+    given.
+    """
     try:
-        key = serialization.load_pem_public_key(sdk_public_key_pem)
+        if sdk_public_key_pem is None:
+            key = serialization.load_der_public_key(
+                base64.b64decode(AGORA_SDK_PUBLIC_KEY)
+            )
+        else:
+            key = serialization.load_pem_public_key(sdk_public_key_pem)
     except ValueError as err:
         raise AgoraError("The Agora SDK public key does not parse") from err
     if not isinstance(key, rsa.RSAPublicKey):
@@ -143,9 +163,11 @@ def check_salt(salt: str) -> str:
 
 
 def encryption_fields(
-    credentials: CameraCredentials, sdk_public_key_pem: bytes | None
+    credentials: CameraCredentials, sdk_public_key_pem: bytes | None = None
 ) -> JSON:
     """The four join fields for an encrypted channel; none for an open one.
+
+    ``sdk_public_key_pem`` is an optional override of Agora's key.
 
     The SDK's internal names (``aesmode`` ...) must not appear on the wire.
     """
@@ -155,12 +177,6 @@ def encryption_fields(
     if not credentials.encryption_key or not credentials.encryption_kdf_salt:
         raise AgoraError(
             "The camera channel is encrypted but its key or salt is missing"
-        )
-    if sdk_public_key_pem is None:
-        # Q6 in docs/QUESTIONS.md: the key comes from the caller.
-        raise AgoraError(
-            "The camera channel is encrypted: pass the Agora SDK public key "
-            "(sdk_public_key_pem)"
         )
     return {
         "aes_mode": mode,
@@ -415,9 +431,10 @@ def _video_stream(node: Mapping[str, Any]) -> VideoStream | None:
 class AgoraCameraSession:
     """One viewing session: offer in, answer out, then keep the socket alive.
 
-    ``sdk_public_key_pem`` is the RSA public key embedded in
-    ``agora-rtc-sdk-ng`` 4.24.0, needed only for encrypted channels. This
-    library does not ship it (Q6 in docs/QUESTIONS.md).
+    Encrypted channels work without any key from the caller: the library
+    ships Agora's public key from ``agora-rtc-sdk-ng`` 4.24.0
+    (:data:`AGORA_SDK_PUBLIC_KEY`). ``sdk_public_key_pem`` (PEM, SPKI) is an
+    optional override of it, never required.
 
     Usage::
 

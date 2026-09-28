@@ -65,6 +65,11 @@ panel all worked. One library item was found.
 |---|---|---|
 | L3 | The cloud camera never streams. Opening it in Home Assistant fails with *"The camera channel is encrypted: pass the Agora SDK public key (sdk_public_key_pem)"*. The integration doesn't pass the key, and nothing tells it to. | Ship Agora's public key (PROTOCOL D §1.7, 'Agora's key', answer to Q6) as the default. `sdk_public_key_pem` becomes an optional override. Add a test that joins an encrypted channel without passing a key, checking that the join message carries `aes_secret` wrapped under that key: decrypt it in the test with a throwaway key only when the override is used, and otherwise check its length and base64. |
 
+- L3: **Fixed in 92225c7.** `agora.AGORA_SDK_PUBLIC_KEY` holds Agora's key (base64 SPKI text from PROTOCOL D §1.7) and is
+  the default; `sdk_public_key_pem` is only an optional override. Tests join an encrypted channel with no key passed (the
+  join carries `aes_secret` as base64 of exactly 128 bytes) and with a throwaway override key (the secret decrypts to the
+  channel key's raw UTF-8 bytes).
+
 ## Round 3 re-test — 2026-09-28, `clean/round-3` @ `a2a398c` (PR #2)
 
 - The default key in `agora.py` is byte-for-byte the one in Agora's `agora-rtc-sdk-ng` 4.24.0 bundle.

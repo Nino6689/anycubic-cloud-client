@@ -169,8 +169,10 @@ arrive; the printer id is tied to its key by `get_printers()` or
 - **Cloud camera**: the camera-open order with its retry after a fresh login,
   and an Agora WebRTC **signalling** client that turns the credentials and a
   browser's SDP offer into an SDP answer (no media passes through it).
-  Encrypted channels need the Agora SDK's public key from the caller
-  ([Q6](docs/QUESTIONS.md)).
+  Encrypted channels work out of the box: the library ships Agora's public
+  key from its Web SDK (`agora-rtc-sdk-ng` 4.24.0, PROTOCOL D §1.7) as the
+  default, so a caller passes nothing. `sdk_public_key_pem` stays as an
+  optional override ([Q6](docs/QUESTIONS.md)).
 
 ## Credits
 
