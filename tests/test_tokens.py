@@ -270,3 +270,26 @@ async def test_verify_without_network_for_other_tokens() -> None:
         await verify_token_signature(session, corrupted)
     ).status is SignatureStatus.CORRUPTED
     assert http.calls == []
+
+
+@pytest.mark.parametrize("alg", ["HS256", "none", None])
+def test_only_rs256_is_accepted(key: rsa.RSAPrivateKey, alg: str | None) -> None:
+    token = make_jwt({"iss": ISSUER}, key)
+    header = {"typ": "JWT"} if alg is None else {"alg": alg, "typ": "JWT"}
+    forged = ".".join([b64url(json.dumps(header).encode()), *token.split(".")[1:]])
+    result = check_token_signature(forged, [key.public_key()])
+    assert result.status is SignatureStatus.INVALID
+    assert not result.acceptable
+    assert check_token_signature(forged, []).status is SignatureStatus.INVALID
+
+
+async def test_verify_rejects_other_algorithms_without_fetching(
+    key: rsa.RSAPrivateKey,
+) -> None:
+    http = FakeSession()
+    token = make_jwt({"iss": ISSUER}, key)
+    header = b64url(json.dumps({"alg": "HS256"}).encode())
+    forged = ".".join([header, *token.split(".")[1:]])
+    result = await verify_token_signature(aiohttp_session(http), forged)
+    assert result.status is SignatureStatus.INVALID
+    assert http.calls == []

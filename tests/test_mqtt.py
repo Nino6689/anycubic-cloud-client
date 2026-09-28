@@ -306,7 +306,7 @@ async def test_connect_subscribes_everything(
     paho = h.paho
     assert paho.client_id == md5_hex(EMAIL + "pcf")
     assert paho.connected_to == ("mqtt-universe.anycubic.com", 8883, 1200)
-    assert paho.insecure is False
+    assert paho.insecure is None  # paho is never put in insecure mode
     assert paho.reconnect_delay == (5, 120)
     assert paho.context is not None
     assert paho.context.check_hostname
@@ -333,7 +333,9 @@ async def test_china_waives_only_the_hostname_check(
 ) -> None:
     h = make_link(http, secrets, region=Region.CHINA)
     await h.link.connect()
-    assert h.paho.insecure is True
+    assert h.paho.insecure is None
+    assert h.paho.context is not None
+    assert h.paho.context.check_hostname is False
     assert h.paho.connected_to == ("mqtt.anycubicloud.com", 8883, 1200)
     assert h.paho.context is not None
     assert h.paho.context.verify_mode == ssl.CERT_REQUIRED

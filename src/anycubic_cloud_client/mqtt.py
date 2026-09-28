@@ -260,7 +260,8 @@ class CloudMqttClient:
         client = self._factory(identity.client_id)
         client.username_pw_set(identity.username, identity.password)
         client.tls_set_context(context)
-        client.tls_insecure_set(not endpoints.mqtt_check_hostname)
+        # No tls_insecure_set(): paho takes the hostname setting from the
+        # context, and the chain is always verified against the pinned CA.
         client.reconnect_delay_set(RECONNECT_MIN_DELAY, RECONNECT_MAX_DELAY)
         client.on_connect = self._on_connect
         client.on_subscribe = self._on_subscribe

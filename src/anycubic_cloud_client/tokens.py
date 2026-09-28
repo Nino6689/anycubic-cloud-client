@@ -264,6 +264,16 @@ def trim_signature(token: str, key: RSAPublicKey) -> str:
     return ".".join((parts[0], parts[1], parts[2][:length]))
 
 
+def _header_alg(segment: str) -> str | None:
+    """The ``alg`` of a JWT header; only RS256 is ever accepted."""
+    try:
+        header = json.loads(_b64url_decode(segment))
+    except (ValueError, binascii.Error):
+        return None
+    alg = header.get("alg") if isinstance(header, dict) else None
+    return alg if isinstance(alg, str) else None
+
+
 def _verify(token: str, key: RSAPublicKey) -> bool:
     header, payload, sig = token.split(".")
     try:
@@ -307,6 +317,8 @@ def check_token_signature(token: str, keys: list[RSAPublicKey]) -> SignatureChec
     parts = token.split(".")
     if len(parts) != 3 or not parts[2]:
         return SignatureCheck(SignatureStatus.CORRUPTED, token)
+    if _header_alg(parts[0]) != "RS256":
+        return SignatureCheck(SignatureStatus.INVALID, token)
     if not keys:
         return SignatureCheck(SignatureStatus.KEYS_UNAVAILABLE, token)
     for key in keys:
@@ -359,5 +371,7 @@ async def verify_token_signature(
     parts = token.split(".")
     if len(parts) != 3 or not parts[2]:
         return SignatureCheck(SignatureStatus.CORRUPTED, token)
+    if _header_alg(parts[0]) != "RS256":
+        return SignatureCheck(SignatureStatus.INVALID, token)
     keys = await fetch_jwks(session, url, timeout)
     return check_token_signature(token, keys)
