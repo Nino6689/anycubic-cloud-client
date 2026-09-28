@@ -63,7 +63,10 @@ def test_secrets_accept_str_pem(material: Material) -> None:
         ("client_id_web", None),
         ("client_id_app", 5),
         ("mqtt_ca_pem", b""),
-        ("mqtt_ca_pem", b"-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----"),
+        (
+            "mqtt_ca_pem",
+            b"-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----",
+        ),
         ("mqtt_client_cert_pem", b"garbage"),
         ("mqtt_client_key_pem", b"garbage"),
         ("mqtt_client_key_pem", 42),
@@ -145,8 +148,16 @@ def test_region_endpoints() -> None:
 
 @pytest.mark.parametrize(
     ("stored", "mode"),
-    [(1, AuthMode.WEB), (2, AuthMode.ANDROID), (3, AuthMode.SLICER), ("3", AuthMode.SLICER),
-     (None, AuthMode.WEB), (7, AuthMode.WEB), (True, AuthMode.WEB), ("x", AuthMode.WEB)],
+    [
+        (1, AuthMode.WEB),
+        (2, AuthMode.ANDROID),
+        (3, AuthMode.SLICER),
+        ("3", AuthMode.SLICER),
+        (None, AuthMode.WEB),
+        (7, AuthMode.WEB),
+        (True, AuthMode.WEB),
+        ("x", AuthMode.WEB),
+    ],
 )
 def test_auth_mode_resolution(stored: object, mode: AuthMode) -> None:
     assert AuthMode.resolve(stored) is mode
@@ -155,7 +166,11 @@ def test_auth_mode_resolution(stored: object, mode: AuthMode) -> None:
 def test_mode_profiles() -> None:
     web, android, slicer = (m.profile for m in AuthMode)
     assert (web.device_type, web.is_cn, web.version) == ("web", "1", "1.0.0")
-    assert (android.device_type, android.is_cn, android.version) == ("android", "0", "1.4.8")
+    assert (android.device_type, android.is_cn, android.version) == (
+        "android",
+        "0",
+        "1.4.8",
+    )
     assert (slicer.device_type, slicer.is_cn, slicer.version) == ("pcf", "1", "V3.0.0")
     assert web.nonce_style is NonceStyle.UUID
     assert android.nonce_style is NonceStyle.PACKED
@@ -172,17 +187,29 @@ def test_signature_matches_the_stated_formula() -> None:
     # PROTOCOL A §3.4: md5(app_id ‖ timestamp ‖ version ‖ secret ‖ nonce ‖ app_id)
     nonce = "5f0c6e2a-9c1d-11f1-8b7e-0242ac120002"
     expected = hashlib.md5(
-        (FAKE_APP_ID + "1759050000000" + "V3.0.0" + FAKE_APP_SECRET + nonce + FAKE_APP_ID).encode(),
+        (
+            FAKE_APP_ID
+            + "1759050000000"
+            + "V3.0.0"
+            + FAKE_APP_SECRET
+            + nonce
+            + FAKE_APP_ID
+        ).encode(),
         usedforsecurity=False,
     ).hexdigest()
-    assert signature(FAKE_APP_ID, "1759050000000", "V3.0.0", FAKE_APP_SECRET, nonce) == expected
+    assert (
+        signature(FAKE_APP_ID, "1759050000000", "V3.0.0", FAKE_APP_SECRET, nonce)
+        == expected
+    )
     assert re.fullmatch(r"[0-9a-f]{32}", expected)
     assert md5_hex("abc") == "900150983cd24fb0d6963f7d28e17f72"
 
 
 def test_uuid_nonce_is_version_1_text() -> None:
     nonce = uuid_nonce()
-    assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}", nonce)
+    assert re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-1[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}", nonce
+    )
     fixed = uuid.UUID("5f0c6e2a-9c1d-11f1-8b7e-0242ac120002")
     assert uuid_nonce(fixed) == "5f0c6e2a-9c1d-11f1-8b7e-0242ac120002"
     assert len(make_nonce(NonceStyle.UUID)) == 36
@@ -241,7 +268,9 @@ def test_timestamp_and_device_id() -> None:
     assert re.fullmatch(r"[0-9a-f]{33}", device)
 
 
-def _headers(profile: AuthMode, current: AuthMode, token: str | None = "TOK", **kw: object) -> dict[str, str]:
+def _headers(
+    profile: AuthMode, current: AuthMode, token: str | None = "TOK", **kw: object
+) -> dict[str, str]:
     return build_headers(
         app_id=FAKE_APP_ID,
         app_secret=FAKE_APP_SECRET,

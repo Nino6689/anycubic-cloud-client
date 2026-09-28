@@ -164,11 +164,23 @@ def test_nulls_never_discard_the_record() -> None:
         parameter={"curr_hotbed_temp": None, "curr_nozzle_temp": "x"},
         version={"need_update": None, "firmware_version": None},
         multi_color_box=[
-            {"id": 0, "status": None, "temp": None, "loaded_slot": None,
-             "feed_status": None, "drying_status": None, "slots": [None, {"index": None}]},
+            {
+                "id": 0,
+                "status": None,
+                "temp": None,
+                "loaded_slot": None,
+                "feed_status": None,
+                "drying_status": None,
+                "slots": [None, {"index": None}],
+            },
             {"status": 1},  # no id: rejected
         ],
-        external_shelves={"id": None, "type": None, "loaded": 1, "color": [1, None, 2, 3]},
+        external_shelves={
+            "id": None,
+            "type": None,
+            "loaded": 1,
+            "color": [1, None, 2, 3],
+        },
         features=[{"name": "x"}, "junk", {"name": "y", "value": False}],
         temp_limit={"nozzle_temp_limit": [1, 2, 3]},
         is_printing=None,
@@ -248,18 +260,34 @@ def test_job_record() -> None:
     assert job.slice_param is not None
     assert job.slice_param.paint_infos[0].filament_used == 94.5
     assert job.slice_param.layer_height == 0.2
-    assert job.slice_result == {"size_x": 60.0, "size_y": 31.0, "size_z": 48.0, "used_filament": 94.5}
+    assert job.slice_result == {
+        "size_x": 60.0,
+        "size_y": 31.0,
+        "size_z": 48.0,
+        "used_filament": 94.5,
+    }
     # no absolute img: image base + slice_param.image_id
-    assert job.image_url == "https://workbentch.s3.us-east-2.amazonaws.com/relative/image/path.png"
+    assert (
+        job.image_url
+        == "https://workbentch.s3.us-east-2.amazonaws.com/relative/image/path.png"
+    )
     assert not job.is_paused
-    china = Job.from_data({**JOB_RECORD, "img": "https://cdn.example.invalid/a.png"}, Region.CHINA)
+    china = Job.from_data(
+        {**JOB_RECORD, "img": "https://cdn.example.invalid/a.png"}, Region.CHINA
+    )
     assert china.image_url == "https://cdn.example.invalid/a.png"
 
 
 def test_job_tolerates_bad_json_and_null_status() -> None:
     job = Job.from_data(
-        {"id": 1, "settings": "{broken", "slice_param": None, "status": None,
-         "reason": "Nozzle clogged", "gcode_name": ""}
+        {
+            "id": 1,
+            "settings": "{broken",
+            "slice_param": None,
+            "status": None,
+            "reason": "Nozzle clogged",
+            "gcode_name": "",
+        }
     )
     assert job.settings is None and job.slice_param is None
     assert job.status is None and job.reason == "Nozzle clogged"
@@ -308,7 +336,9 @@ def test_job_detail() -> None:
     assert job.limits.hotbed == (35, 120)
     assert job.target_nozzle_temp == 220
     assert job.type_function_ids == (1, 2)
-    bare = JobDetail.from_data({"print_speed_model_des": [{"title": "x"}], "temp": None})
+    bare = JobDetail.from_data(
+        {"print_speed_model_des": [{"title": "x"}], "temp": None}
+    )
     assert bare.speed_modes == () and bare.limits.nozzle is None
 
 
@@ -340,7 +370,9 @@ def test_printer_file_and_model() -> None:
 
 
 def test_account_identifier() -> None:
-    assert Account.from_data({"id": 5, "user_email": "", "mobile": ""}).identifier == "5"
+    assert (
+        Account.from_data({"id": 5, "user_email": "", "mobile": ""}).identifier == "5"
+    )
     assert Account(user_id=None).identifier == ""
     assert "@" not in repr(Account.from_data({"id": 5, "user_email": "a@b"}))
 

@@ -60,18 +60,27 @@ async def test_get_request_is_signed(http: FakeSession, secrets: CloudSecrets) -
     assert response.data == {"id": 5}
     assert response.code == 1
     call = http.calls[0]
-    assert call.url == "https://cloud-universe.anycubic.com/p/p/workbench/api/v2/printer/info"
+    assert (
+        call.url
+        == "https://cloud-universe.anycubic.com/p/p/workbench/api/v2/printer/info"
+    )
     assert call.params == {"id": "5"}
     assert "data" not in call.kwargs
     headers = call.headers
     assert headers["XX-Token"] == "USER-TOKEN"
     assert headers["Content-Type"] == "application/json"
     assert headers["Xx-Signature"] == signature(
-        FAKE_APP_ID, headers["Xx-Timestamp"], "V3.0.0", FAKE_APP_SECRET, headers["Xx-Nonce"]
+        FAKE_APP_ID,
+        headers["Xx-Timestamp"],
+        "V3.0.0",
+        FAKE_APP_SECRET,
+        headers["Xx-Nonce"],
     )
 
 
-async def test_post_sends_json_even_when_empty(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_post_sends_json_even_when_empty(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("POST", "/work/index/getUserStore", envelope({}))
     client = make_client(http, secrets)
     await client.request("POST", "/work/index/getUserStore")
@@ -80,7 +89,9 @@ async def test_post_sends_json_even_when_empty(http: FakeSession, secrets: Cloud
     assert "params" not in call.kwargs
 
 
-async def test_request_timeout_is_passed(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_request_timeout_is_passed(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", USER, envelope(USER_INFO))
     client = make_client(http, secrets, request_timeout=12)
     await client.request("GET", USER)
@@ -112,19 +123,27 @@ async def test_request_error_is_service_unavailable(
         await make_client(http, secrets).check()
 
 
-async def test_code_1007_is_printer_removed(http: FakeSession, secrets: CloudSecrets) -> None:
-    http.add("GET", "/v2/printer/info", envelope(None, msg="printer not exist", code=1007))
+async def test_code_1007_is_printer_removed(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    http.add(
+        "GET", "/v2/printer/info", envelope(None, msg="printer not exist", code=1007)
+    )
     with pytest.raises(PrinterRemovedError, match="printer not exist"):
         await make_client(http, secrets).get_printer(5)
 
 
-async def test_non_object_answer_is_unexpected(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_non_object_answer_is_unexpected(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", USER, [1, 2])
     with pytest.raises(UnexpectedResponseError):
         await make_client(http, secrets).request("GET", USER)
 
 
-async def test_status_code_is_not_inspected(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_status_code_is_not_inspected(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", USER, FakeResponse(envelope(USER_INFO), status=500))
     account = await make_client(http, secrets).check()
     assert account.user_id == 424242
@@ -198,7 +217,11 @@ async def test_debug_api_calls_logs_url_not_secrets(
 async def test_web_mode_check(http: FakeSession, secrets: CloudSecrets) -> None:
     http.add("GET", USER, envelope(USER_INFO))
     client = AnycubicCloudClient.from_entry(
-        aiohttp_session(http), secrets, token="web-token", auth_mode=1, region="international"
+        aiohttp_session(http),
+        secrets,
+        token="web-token",
+        auth_mode=1,
+        region="international",
     )
     account = await client.check()
     assert account.user_id == 424242
@@ -217,7 +240,11 @@ async def test_web_mode_check(http: FakeSession, secrets: CloudSecrets) -> None:
 async def test_android_mode_check(http: FakeSession, secrets: CloudSecrets) -> None:
     http.add("GET", USER, envelope({**USER_INFO, "user_email": "", "mobile": "+000"}))
     client = AnycubicCloudClient.from_entry(
-        aiohttp_session(http), secrets, token="android-token", auth_mode=2, device_id="devid"
+        aiohttp_session(http),
+        secrets,
+        token="android-token",
+        auth_mode=2,
+        device_id="devid",
     )
     account = await client.check()
     assert account.identifier == "+000"
@@ -270,7 +297,11 @@ async def test_slicer_china_uses_token_directly(
 ) -> None:
     http.add("GET", USER, envelope(USER_INFO))
     client = AnycubicCloudClient.from_entry(
-        aiohttp_session(http), secrets, token="cn-token", auth_mode=3, region=Region.CHINA
+        aiohttp_session(http),
+        secrets,
+        token="cn-token",
+        auth_mode=3,
+        region=Region.CHINA,
     )
     await client.check()
     assert http.calls[0].url.startswith("https://cloud-platform.anycubicloud.com/")
@@ -423,7 +454,12 @@ async def test_token_store_overlay(http: FakeSession, secrets: CloudSecrets) -> 
     assert http.calls_to(EXCHANGE) == []
     assert http.calls[0].headers["XX-Token"] == "STORED"
     exported = client.export_token_store()
-    assert set(exported) == {"auth_token", "auth_access_token", "device_id", "auth_mode"}
+    assert set(exported) == {
+        "auth_token",
+        "auth_access_token",
+        "device_id",
+        "auth_mode",
+    }
     assert not client.apply_token_store({"unrelated": 1})
 
 
@@ -441,7 +477,9 @@ async def test_stored_null_overwrites(http: FakeSession, secrets: CloudSecrets) 
 
 
 def test_repr_hides_tokens(http: FakeSession, secrets: CloudSecrets) -> None:
-    client = make_client(http, secrets, user_token="SECRET-USER", access_token="SECRET-ACC")
+    client = make_client(
+        http, secrets, user_token="SECRET-USER", access_token="SECRET-ACC"
+    )
     text = repr(client)
     assert "SECRET" not in text
     assert "SLICER" in text

@@ -172,7 +172,9 @@ class _Context:
         return None
 
 
-type Responder = FakeResponse | BaseException | dict[str, Any] | list[Any] | Callable[[Call], Any]
+type Responder = (
+    FakeResponse | BaseException | dict[str, Any] | list[Any] | Callable[[Call], Any]
+)
 
 
 @dataclass
@@ -198,7 +200,9 @@ class FakeSession:
         if not queue:
             raise AssertionError(f"unexpected request {call.method} {call.path}")
         responder = queue.pop(0) if len(queue) > 1 else queue[0]
-        if callable(responder) and not isinstance(responder, FakeResponse | BaseException):
+        if callable(responder) and not isinstance(
+            responder, FakeResponse | BaseException
+        ):
             responder = responder(call)
         if isinstance(responder, FakeResponse | BaseException):
             return responder

@@ -52,7 +52,9 @@ def order_bodies(http: FakeSession) -> list[Any]:
 
 
 async def test_get_printers(http: FakeSession, secrets: CloudSecrets) -> None:
-    http.add("GET", "/work/printer/getPrinters", envelope([{"id": 1, "name": "a"}, None]))
+    http.add(
+        "GET", "/work/printer/getPrinters", envelope([{"id": 1, "name": "a"}, None])
+    )
     printers = await make_client(http, secrets).get_printers()
     assert [p.id for p in printers] == [1]
     http.routes.clear()
@@ -76,7 +78,9 @@ async def test_get_printer(http: FakeSession, secrets: CloudSecrets) -> None:
     assert http.calls[0].params == {"id": str(PRINTER_ID)}
 
 
-async def test_get_printer_mismatch_and_missing(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_get_printer_mismatch_and_missing(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", "/v2/printer/info", envelope(detail(id=99)), envelope(None))
     client = make_client(http, secrets)
     with pytest.raises(UnexpectedResponseError, match="another printer"):
@@ -85,9 +89,13 @@ async def test_get_printer_mismatch_and_missing(http: FakeSession, secrets: Clou
         await client.get_printer(PRINTER_ID)
 
 
-async def test_raw_and_catalogue_endpoints(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_raw_and_catalogue_endpoints(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", "/v2/Printer/status", envelope({"x": 1}))
-    http.add("GET", "/v2/printer/all", envelope({"printer_type": [{"machine_type": 1}, 2]}))
+    http.add(
+        "GET", "/v2/printer/all", envelope({"printer_type": [{"machine_type": 1}, 2]})
+    )
     http.add("GET", "/v2/project/printHistory", envelope([1]))
     http.add("GET", "/v2/project/monitor", envelope({"m": 1}))
     client = make_client(http, secrets)
@@ -121,7 +129,9 @@ async def test_rename(http: FakeSession, secrets: CloudSecrets) -> None:
 # -- jobs -------------------------------------------------------------------------------
 
 
-async def test_job_list_once_for_all_printers(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_job_list_once_for_all_printers(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     other = {**JOB_RECORD, "id": 1, "printer_id": 777}
     http.add("GET", "/work/project/getProjects", envelope([other, JOB_RECORD, "junk"]))
     client = make_client(http, secrets)
@@ -134,7 +144,9 @@ async def test_job_list_once_for_all_printers(http: FakeSession, secrets: CloudS
     assert calls[0].params == {"page": "1", "limit": "2000"}
 
 
-async def test_job_list_null_and_filter(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_job_list_null_and_filter(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("GET", "/work/project/getProjects", envelope(None))
     client = make_client(http, secrets)
     assert await client.get_projects(print_status=2) == []
@@ -185,7 +197,9 @@ async def test_generic_order_results(http: FakeSession, secrets: CloudSecrets) -
         await client.send_order(5, 1, {}, 0)
 
 
-async def test_generic_order_unknown_ids(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_generic_order_unknown_ids(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("POST", ORDER, OK)
     client = make_client(http, secrets)
     await client.send_order(5, 44)
@@ -233,7 +247,9 @@ async def test_every_order_shape(http: FakeSession, secrets: CloudSecrets) -> No
     await c.delete_printer_file(p, FileSource.UDISK, "usb.gcode")
     await c.set_ai_detection(p, True)
     await c.set_ai_detection(
-        p, False, {"type": 1, "count": 30, "sensitivity_level": (2, 2), "notice_type": None}
+        p,
+        False,
+        {"type": 1, "count": 30, "sensitivity_level": (2, 2), "notice_type": None},
     )
     assert order_bodies(http) == [
         {"order_id": 2, "printer_id": p, "project_id": 77, "data": None, "ams_info": None, "settings": None},
@@ -307,7 +323,9 @@ async def test_print_settings(http: FakeSession, secrets: CloudSecrets) -> None:
     c = make_client(http, secrets)
     job = JobDetail.from_data(JOB_DETAIL)
     await c.set_speed_mode(5, 77, 3, job)
-    await c.set_print_settings(5, 77, {"target_nozzle_temp": 220, "fan_speed_pct": 50}, job=job)
+    await c.set_print_settings(
+        5, 77, {"target_nozzle_temp": 220, "fan_speed_pct": 50}, job=job
+    )
     await c.set_print_settings(5, 77, {"on_time": 2.5})
     assert order_bodies(http) == [
         {"order_id": 6, "printer_id": 5, "project_id": 77, "data": {"settings": {"print_speed_mode": 3}}},
@@ -351,7 +369,9 @@ def _printer_with_updates() -> PrinterDetail:
     return PrinterDetail.from_data(data)
 
 
-async def test_printer_firmware_update(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_printer_firmware_update(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add(
         "GET",
         "/work/printer/update_version",
@@ -398,7 +418,12 @@ async def test_cloud_files(http: FakeSession, secrets: CloudSecrets) -> None:
     assert files[0].id == 700001
     assert http.calls[0].body == {"page": 1, "limit": 10}
     assert await c.list_cloud_files(page=2, printable=True, machine_type=0) == []
-    assert http.calls[1].body == {"page": 2, "limit": 10, "printable": 1, "machine_type": 0}
+    assert http.calls[1].body == {
+        "page": 2,
+        "limit": 10,
+        "printable": 1,
+        "machine_type": 0,
+    }
     await c.delete_cloud_files([700001])
     assert http.calls[2].body == {"idArr": [700001]}
     with pytest.raises(OrderRefusedError, match="delete"):
@@ -410,7 +435,9 @@ async def test_cloud_files(http: FakeSession, secrets: CloudSecrets) -> None:
 async def test_storage_quota(http: FakeSession, secrets: CloudSecrets) -> None:
     quota = {"used_bytes": 10, "total_bytes": 100, "used": "10 B", "total": "100 B",
              "user_file_exists": True}  # fmt: skip
-    http.add("POST", "/work/index/getUserStore", envelope(quota), envelope({"used": "x"}))
+    http.add(
+        "POST", "/work/index/getUserStore", envelope(quota), envelope({"used": "x"})
+    )
     c = make_client(http, secrets)
     result = await c.get_storage_quota()
     assert result.available_bytes == 90 and result.user_file_exists is True
@@ -436,7 +463,9 @@ def _quota(used: int) -> dict[str, Any]:
 def _upload_routes(http: FakeSession, *, put: Any = None, register: Any = None) -> None:
     http.add("POST", LOCK, envelope({"id": 55, "preSignUrl": PUT_URL}))
     http.add("PUT", PUT_URL, put if put is not None else FakeResponse(text=""))
-    http.add("POST", REGISTER, register if register is not None else envelope({"id": 700001}))
+    http.add(
+        "POST", REGISTER, register if register is not None else envelope({"id": 700001})
+    )
     http.add("POST", UNLOCK, envelope(None))
 
 
@@ -444,8 +473,18 @@ async def test_permanent_upload(http: FakeSession, secrets: CloudSecrets) -> Non
     _upload_routes(http)
     http.add("POST", QUOTA, _quota(100), _quota(110))
     c = make_client(http, secrets)
-    assert await c.upload_file("dir/benchy.gcode", b"0123456789", temporary=False) == 700001
-    assert [x.path for x in http.calls] == [QUOTA, LOCK, PUT_URL, REGISTER, UNLOCK, QUOTA]
+    assert (
+        await c.upload_file("dir/benchy.gcode", b"0123456789", temporary=False)
+        == 700001
+    )
+    assert [x.path for x in http.calls] == [
+        QUOTA,
+        LOCK,
+        PUT_URL,
+        REGISTER,
+        UNLOCK,
+        QUOTA,
+    ]
     assert http.calls[1].body == {"size": 10, "name": "benchy.gcode", "is_temp_file": 0}
     put = http.calls[2]
     assert put.kwargs["data"] == b"0123456789"
@@ -454,7 +493,9 @@ async def test_permanent_upload(http: FakeSession, secrets: CloudSecrets) -> Non
     assert http.calls[4].body == {"id": 55, "is_delete_cos": 0}
 
 
-async def test_temporary_upload_skips_quota(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_temporary_upload_skips_quota(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     _upload_routes(http)
     c = make_client(http, secrets, mode=AuthMode.WEB)
     assert await c.upload_file("a.gcode", b"x", temporary=True) == 700001
@@ -547,12 +588,18 @@ async def test_start_print_cloud_file(
     }
 
 
-async def test_start_print_printer_file(http: FakeSession, secrets: CloudSecrets) -> None:
+async def test_start_print_printer_file(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
     http.add("POST", ORDER, OK)
     c = make_client(http, secrets)
     await c.start_print_printer_file(5, "part.gcode")
     await c.start_print_printer_file(
-        5, "usb.gcode", FileSource.UDISK, folder="/sub/", task_settings=TaskSettings(1, 1)
+        5,
+        "usb.gcode",
+        FileSource.UDISK,
+        folder="/sub/",
+        task_settings=TaskSettings(1, 1),
     )
     first, second = order_bodies(http)
     assert first == {
@@ -598,7 +645,9 @@ def _ace_units() -> Any:
                         "status": 4, "edit_status": 0}]  # fmt: skip
     first = data["multi_color_box"]
     first["id"] = 0
-    return PrinterDetail.from_data({**data, "multi_color_box": [first, second]}).ace_units
+    return PrinterDetail.from_data(
+        {**data, "multi_color_box": [first, second]}
+    ).ace_units
 
 
 async def test_print_by_gcode_id_with_mapping(
@@ -624,8 +673,15 @@ async def test_print_by_gcode_id_with_mapping(
     }  # fmt: skip
 
 
-async def test_print_by_gcode_id_errors(http: FakeSession, secrets: CloudSecrets) -> None:
-    http.add("GET", "/work/gcode/infoFdm", envelope({"file_id": None}), envelope({"file_id": 1}))
+async def test_print_by_gcode_id_errors(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    http.add(
+        "GET",
+        "/work/gcode/infoFdm",
+        envelope({"file_id": None}),
+        envelope({"file_id": 1}),
+    )
     c = make_client(http, secrets)
     with pytest.raises(UnexpectedResponseError, match="file id"):
         await c.print_by_gcode_id(5, 1)
@@ -651,7 +707,12 @@ async def test_upload_and_print_without_cloud_save(
     http.add("POST", ORDER, OK)
     c = make_client(http, secrets)
     result = await c.upload_and_print(
-        5, "part.gcode", GCODE, save_in_cloud=False, slots=[0, 3], ace_units=_ace_units()
+        5,
+        "part.gcode",
+        GCODE,
+        save_in_cloud=False,
+        slots=[0, 3],
+        ace_units=_ace_units(),
     )
     assert not result.saved_in_cloud and result.gcode_id is None
     assert result.cloud_file_id == 700001
@@ -679,7 +740,9 @@ async def test_upload_and_print_rejects_before_uploading(
     with pytest.raises(SlotMappingError):
         await c.upload_and_print(5, "a.gcode", GCODE, save_in_cloud=False, slots=[0])
     with pytest.raises(SlotMappingError):
-        await c.upload_and_print(5, "a.gcode", GCODE, save_in_cloud=True, ace_units=_ace_units())
+        await c.upload_and_print(
+            5, "a.gcode", GCODE, save_in_cloud=True, ace_units=_ace_units()
+        )
     with pytest.raises(UploadError, match="gcode"):
         await c.upload_and_print(
             5, "a.zip", GCODE, save_in_cloud=False, slots=[0, 1], ace_units=_ace_units()

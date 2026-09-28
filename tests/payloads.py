@@ -117,8 +117,18 @@ PRINTER_DETAIL: dict[str, Any] = {
         "model_id": 40001,
         "auto_feed": 1,
         "loaded_slot": -1,
-        "feed_status": {"code": 200, "type": -1, "current_status": -1, "slot_index": -1},
-        "drying_status": {"status": 0, "duration": 0, "target_temp": 0, "remain_time": 0},
+        "feed_status": {
+            "code": 200,
+            "type": -1,
+            "current_status": -1,
+            "slot_index": -1,
+        },
+        "drying_status": {
+            "status": 0,
+            "duration": 0,
+            "target_temp": 0,
+            "remain_time": 0,
+        },
         "curr_nozzle_temp": 31,
         "target_nozzle_temp": 0,
         "slots": [
@@ -314,7 +324,12 @@ def detail(**changes: Any) -> dict[str, Any]:
 
 # PROTOCOL C §4 messages (envelopes constructed as the protocol shows them).
 def mqtt(
-    kind: str, action: str, state: str, data: Any = None, code: int = 200, msg: str = "done"
+    kind: str,
+    action: str,
+    state: str,
+    data: Any = None,
+    code: int = 200,
+    msg: str = "done",
 ) -> dict[str, Any]:
     return {
         "type": kind,
@@ -338,8 +353,18 @@ ACE_GET_INFO_DATA: dict[str, Any] = {
             "model_id": 40001,
             "auto_feed": 1,
             "loaded_slot": -1,
-            "feed_status": {"code": 200, "type": -1, "current_status": -1, "slot_index": -1},
-            "drying_status": {"status": 0, "duration": 0, "target_temp": 0, "remain_time": 0},
+            "feed_status": {
+                "code": 200,
+                "type": -1,
+                "current_status": -1,
+                "slot_index": -1,
+            },
+            "drying_status": {
+                "status": 0,
+                "duration": 0,
+                "target_temp": 0,
+                "remain_time": 0,
+            },
             "slots": [
                 {
                     "index": 0,

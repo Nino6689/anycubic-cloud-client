@@ -25,17 +25,24 @@ from anycubic_cloud_client.printing import ams_info, validate_slots
 def test_order_shape_table() -> None:
     string_ids = {1231, 1232, 1001, 201, 1213, 1216, 1221, 1243}
     for order, shape in ORDER_SHAPES.items():
-        body = build_order_body(5, order, data={"x": 1} if shape is OrderShape.PROJECT else None)
+        body = build_order_body(
+            5, order, data={"x": 1} if shape is OrderShape.PROJECT else None
+        )
         assert isinstance(body["order_id"], str) == (order in string_ids), order
         assert ("project_id" in body) == (
-            shape in (OrderShape.PROJECT, OrderShape.BARE_PROJECT, OrderShape.PRINT_CONTROL)
+            shape
+            in (OrderShape.PROJECT, OrderShape.BARE_PROJECT, OrderShape.PRINT_CONTROL)
         ), order
     assert shape_for(Order.SET_LIGHT_STATUS, None) is OrderShape.PRINTER
     assert shape_for(Order.SET_LIGHT_STATUS, 3) is OrderShape.PROJECT
 
 
 def test_order_body_defaults() -> None:
-    assert build_order_body(5, 201) == {"order_id": "201", "printer_id": 5, "data": None}
+    assert build_order_body(5, 201) == {
+        "order_id": "201",
+        "printer_id": 5,
+        "data": None,
+    }
     assert build_order_body(5, 103) == {
         "order_id": 103, "printer_id": 5, "project_id": 0, "data": {}}  # fmt: skip
     assert build_order_body(5, 1) == {
@@ -166,7 +173,13 @@ def test_colors_by_paint_index() -> None:
     [
         ({}, "empty paint info"),
         ({"paint_info": [{"paint_index": 0}]}, "filament used"),
-        ({"paint_info": [{"paint_index": 0}, {"paint_index": 1}], "filament_used_g": [1.0]}, "shorter"),
+        (
+            {
+                "paint_info": [{"paint_index": 0}, {"paint_index": 1}],
+                "filament_used_g": [1.0],
+            },
+            "shorter",
+        ),
         ({"paint_info": ["x"], "filament_used_g": [1.0]}, "not an object"),
         ({"paint_info": [{"paint_index": 3}], "filament_used_g": [1.0]}, "paint_index"),
     ],
@@ -177,7 +190,10 @@ def test_color_errors(header: dict[str, object], message: str) -> None:
 
 
 def test_single_filament_scalar() -> None:
-    header = {"paint_info": [{"paint_index": 0, "material_type": "PLA"}], "filament_used_g": 2}
+    header = {
+        "paint_info": [{"paint_index": 0, "material_type": "PLA"}],
+        "filament_used_g": 2,
+    }
     (color,) = gcode_colors(header)
     assert color.paint.filament_used == 2
     assert color.paint.material_type == "PLA"

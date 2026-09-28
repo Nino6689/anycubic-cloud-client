@@ -135,7 +135,9 @@ def test_extract_fragment_and_plain() -> None:
 
 def test_decode_claims() -> None:
     now = time.time()
-    token = make_jwt({"exp": int(now) + 100, "tokenType": "access-token", "iss": ISSUER})
+    token = make_jwt(
+        {"exp": int(now) + 100, "tokenType": "access-token", "iss": ISSUER}
+    )
     claims = decode_claims(token)
     assert claims is not None
     assert claims.issuer == ISSUER
@@ -151,7 +153,9 @@ def test_decode_claims() -> None:
     assert no_exp.seconds_left() is None
 
 
-@pytest.mark.parametrize("token", ["opaque", "eyJ", "eyJhbGci.!!!.x", "eyJ." + b64url(b"[1]")])
+@pytest.mark.parametrize(
+    "token", ["opaque", "eyJ", "eyJhbGci.!!!.x", "eyJ." + b64url(b"[1]")]
+)
 def test_decode_claims_not_a_jwt(token: str) -> None:
     assert decode_claims(token) is None
 
@@ -196,7 +200,9 @@ def test_not_checked_corrupted_and_no_keys(key: rsa.RSAPrivateKey) -> None:
     assert check_token_signature(other_issuer, []).status is SignatureStatus.NOT_CHECKED
     corrupted = make_jwt({"iss": ISSUER}).rsplit(".", 1)[0]
     assert check_token_signature(corrupted, []).status is SignatureStatus.CORRUPTED
-    assert check_token_signature(corrupted + ".", []).status is SignatureStatus.CORRUPTED
+    assert (
+        check_token_signature(corrupted + ".", []).status is SignatureStatus.CORRUPTED
+    )
     token = make_jwt({"iss": ISSUER}, key)
     result = check_token_signature(token, [])
     assert result.status is SignatureStatus.KEYS_UNAVAILABLE
@@ -207,7 +213,15 @@ def test_jwks_parsing_skips_bad_entries(key: rsa.RSAPrivateKey) -> None:
     assert jwks_public_keys(None) == []
     assert jwks_public_keys({"keys": "x"}) == []
     keys = jwks_public_keys(
-        {"keys": [jwk(key), {"kty": "EC"}, {"kty": "RSA"}, "junk", {"kty": "RSA", "n": "!", "e": "AQAB"}]}
+        {
+            "keys": [
+                jwk(key),
+                {"kty": "EC"},
+                {"kty": "RSA"},
+                "junk",
+                {"kty": "RSA", "n": "!", "e": "AQAB"},
+            ]
+        }
     )
     assert len(keys) == 1
 
@@ -240,7 +254,11 @@ async def test_verify_accepts_when_keys_unavailable(key: rsa.RSAPrivateKey) -> N
 async def test_verify_without_network_for_other_tokens() -> None:
     http = FakeSession()
     session = aiohttp_session(http)
-    assert (await verify_token_signature(session, "opaque")).status is SignatureStatus.NOT_CHECKED
+    assert (
+        await verify_token_signature(session, "opaque")
+    ).status is SignatureStatus.NOT_CHECKED
     corrupted = make_jwt({"iss": ISSUER}).rsplit(".", 1)[0]
-    assert (await verify_token_signature(session, corrupted)).status is SignatureStatus.CORRUPTED
+    assert (
+        await verify_token_signature(session, corrupted)
+    ).status is SignatureStatus.CORRUPTED
     assert http.calls == []
