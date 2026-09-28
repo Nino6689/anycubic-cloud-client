@@ -13,7 +13,7 @@ import json
 import logging
 import posixpath
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -89,6 +89,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # -- constants (PROTOCOL A §3.7, §3.8; B §8.4, §9) -------------------------
 
+#: Light type sent when the printer has reported none (B §5.4.7).
+DEFAULT_LIGHT_TYPE = 1
 #: Token exchange: 2 attempts, 2 s apart.
 EXCHANGE_ATTEMPTS = 2
 EXCHANGE_RETRY_DELAY = 2.0
@@ -190,6 +192,10 @@ class AnycubicCloudClient:
         )
         self._last_slow_warning: float | None = None
         self._clock: Callable[[], float] = time.monotonic
+        # Light types reported over MQTT, by printer key (B §5.4.7, C §4.7),
+        # and the printer keys learned from the printer lists, by id.
+        self._light_types: dict[str, set[int]] = {}
+        self._printer_keys: dict[int, str] = {}
 
     @classmethod
     def from_entry(
@@ -523,13 +529,17 @@ class AnycubicCloudClient:
         """The account's printers (E4); empty while the only printer is in LAN Mode."""
         response = await self.request("GET", "/work/printer/getPrinters")
         items = self._data_list(response, "printer list", null_is_empty=False)
-        return [PrinterSummary.from_data(i) for i in items if isinstance(i, Mapping)]
+        return self._learn_keys(
+            [PrinterSummary.from_data(i) for i in items if isinstance(i, Mapping)]
+        )
 
     async def get_printers_status(self) -> list[PrinterSummary]:
         """E5: printer records of the same shape as E4 (not used by 2.x)."""
         response = await self.request("GET", "/work/printer/printersStatus")
         items = self._data_list(response, "printers status", null_is_empty=True)
-        return [PrinterSummary.from_data(i) for i in items if isinstance(i, Mapping)]
+        return self._learn_keys(
+            [PrinterSummary.from_data(i) for i in items if isinstance(i, Mapping)]
+        )
 
     async def get_printer(self, printer_id: int) -> PrinterDetail:
         """One printer's detail (E6). Code 1007 raises :class:`PrinterRemovedError`."""
@@ -541,7 +551,38 @@ class AnycubicCloudClient:
             raise UnexpectedResponseError(
                 "printer detail: the answer is for another printer"
             )
+        self._learn_keys([detail])
         return detail
+
+    def _learn_keys[P: PrinterSummary | PrinterDetail](
+        self, printers: list[P]
+    ) -> list[P]:
+        for printer in printers:
+            if printer.id is not None and printer.key:
+                self._printer_keys[printer.id] = printer.key
+        return printers
+
+    # -- light types (PROTOCOL B §5.4.7, C §4.7) ------------------------------
+
+    def remember_printer_key(self, printer_id: int, printer_key: str) -> None:
+        """Tie a printer id to its key (learned anyway from the printer lists)."""
+        self._printer_keys[int(printer_id)] = printer_key
+
+    def note_light_types(self, printer_key: str, types: Iterable[int | None]) -> None:
+        """Record light types the printer reported (its ``light`` messages).
+
+        :class:`~anycubic_cloud_client.mqtt.CloudMqttClient` calls this for
+        every ``light`` report; an integration may also call it to restore
+        types it remembered across a restart.
+        """
+        known = self._light_types.setdefault(printer_key, set())
+        known.update(int(t) for t in types if t is not None)
+
+    def light_type(self, printer_id: int) -> int | None:
+        """The printer's light type: the lowest reported, ``None`` if none yet."""
+        key = self._printer_keys.get(int(printer_id))
+        known = self._light_types.get(key) if key is not None else None
+        return min(known) if known else None
 
     async def get_printer_status(self, printer_id: int) -> Any:
         """E7 ``GET /v2/Printer/status`` (capital P); raw ``data`` (shape unknown)."""
@@ -747,10 +788,18 @@ class AnycubicCloudClient:
         on: bool,
         brightness: int | None = None,
         *,
-        light_type: int = 1,
+        light_type: int | None = None,
         job_id: int | None = None,
     ) -> str | None:
-        """Order 1233: shape J with the latest job's id, shape P without a job."""
+        """Order 1233: shape J with the latest job's id, shape P without a job.
+
+        ``light_type`` defaults to the type the printer last reported over
+        MQTT (:meth:`light_type`), and to 1 when none has been reported
+        (PROTOCOL B §5.4.7). An explicit value wins.
+        """
+        if light_type is None:
+            reported = self.light_type(printer_id)
+            light_type = DEFAULT_LIGHT_TYPE if reported is None else reported
         return await self.send_order(
             printer_id,
             Order.SET_LIGHT_STATUS,

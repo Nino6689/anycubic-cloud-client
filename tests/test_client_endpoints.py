@@ -1081,3 +1081,47 @@ async def test_camera_failed_login_gives_up(
         await c.open_camera(5)
     assert info.value.__cause__ is not None
     assert len(http.calls_to(ORDER)) == 1
+
+
+# -- light type (PROTOCOL B §5.4.7; ACCEPTANCE L1) -----------------------------------
+
+
+async def test_set_light_uses_the_reported_type(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    """L1: without a light type the order carries the one the printer reported."""
+    http.add("GET", "/work/printer/getPrinters", envelope([{"id": 5, "key": "k5"}]))
+    http.add("POST", ORDER, OK)
+    c = make_client(http, secrets)
+    await c.set_light(5, True)  # nothing reported yet: 1
+    assert c.light_type(5) is None
+    await c.get_printers()
+    c.note_light_types("k5", [None])
+    assert c.light_type(5) is None
+    c.note_light_types("k5", [2])
+    assert c.light_type(5) == 2
+    await c.set_light(5, True)
+    await c.set_light(5, False, job_id=77)
+    c.note_light_types("k5", [3, 2])  # the lowest reported type wins (C §4.7)
+    await c.set_light(5, True, 40)
+    await c.set_light(5, True, light_type=1)  # an explicit value still wins
+    assert [b["data"]["type"] for b in order_bodies(http)] == [1, 2, 2, 2, 1]
+    assert order_bodies(http)[2]["project_id"] == 77
+
+
+async def test_light_type_keys_from_detail_and_by_hand(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    http.add("GET", "/v2/printer/info", envelope(detail()))
+    http.add("GET", "/work/printer/printersStatus", envelope([{"id": 6, "key": "k6"}]))
+    c = make_client(http, secrets)
+    c.note_light_types("fakeprinterkey0001", [0])
+    assert c.light_type(PRINTER_ID) is None  # the key is not known yet
+    await c.get_printer(PRINTER_ID)
+    assert c.light_type(PRINTER_ID) == 0  # type 0 is a type, not "none"
+    c.note_light_types("k6", [2])
+    await c.get_printers_status()
+    assert c.light_type(6) == 2
+    c.remember_printer_key(7, "k7")
+    c.note_light_types("k7", [4])
+    assert c.light_type(7) == 4

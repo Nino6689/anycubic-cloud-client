@@ -518,6 +518,9 @@ class CloudMqttClient:
         message = parse_cloud_message(info, decoded)
         if message is None:
             return
+        if light_types := message.light_types:
+            # set_light sends the type the printer reported (B §5.4.7).
+            self._cloud.note_light_types(info.printer_key, light_types)
         if self.debug_messages or not message.understood:
             _LOGGER.debug(
                 "Message %s/%s/%s on %s%s",

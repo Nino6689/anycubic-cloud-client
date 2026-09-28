@@ -699,3 +699,45 @@ def test_dispatch_after_loop_closed(http: FakeSession, secrets: CloudSecrets) ->
     link._loop = loop
     loop.close()
     link._dispatch(print)
+
+
+async def test_light_reports_set_the_light_type(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    """L1: ``light`` reports feed the type set_light sends (B §5.4.7, C §4.7)."""
+    h = make_link(http, secrets)
+    cloud = h.link._cloud
+    cloud.remember_printer_key(12345, PRINTER_KEY)
+    h.link.subscribe_printer(PRINTER_KEY, MACHINE_TYPE)
+    await h.link.connect()
+    topic = f"anycubic/anycubicCloud/v1/printer/public/{MACHINE_TYPE}/{PRINTER_KEY}"
+    for body in (
+        message("light", "control", "failed", {"type": 1, "status": 1}),
+        message("light", "query", "done", None),
+        message("fan", "auto", "done", {"type": 1}),
+    ):
+        h.paho.deliver(f"{topic}/light/report", json.dumps(body).encode())
+    await settle()
+    assert cloud.light_type(12345) is None
+    h.paho.deliver(
+        f"{topic}/light/report",
+        json.dumps(
+            message(
+                "light",
+                "query",
+                "done",
+                {"lights": [{"type": 3, "status": 0}, {"type": 2, "status": 1}, "x"]},
+            )
+        ).encode(),
+    )
+    await settle()
+    assert cloud.light_type(12345) == 2
+    h.paho.deliver(
+        f"{topic}/light/report",
+        json.dumps(
+            message("light", "control", "done", {"type": 1, "status": 1})
+        ).encode(),
+    )
+    await settle()
+    assert cloud.light_type(12345) == 1
+    assert h.messages[-1].light_types == (1,)

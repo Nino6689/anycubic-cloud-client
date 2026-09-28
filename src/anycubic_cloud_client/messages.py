@@ -297,6 +297,21 @@ class CloudMessage:
     def data(self) -> Any:
         return self.raw.get("data")
 
+    @property
+    def light_types(self) -> tuple[int, ...]:
+        """The light types an understood ``light`` message reports (C §4.7).
+
+        A query answer lists every light in ``data.lights``; a control answer
+        or a pushed change carries one light as ``data``. Empty otherwise.
+        """
+        if self.kind != "light" or not self.understood:
+            return ()
+        body = as_map(self.data)
+        lights = body.get("lights")
+        items = lights if isinstance(lights, list) else [body]
+        types = (as_int(as_map(item).get("type")) for item in items)
+        return tuple(t for t in types if t is not None)
+
 
 # --------------------------------------------------------------------------
 # Decoding and routing
