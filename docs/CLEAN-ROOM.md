@@ -50,6 +50,7 @@ nobody needs to read that package's source for this.
 |---|---|---|---|---|---|
 | 2026-09-28 | Specification | Claude (local, Nino's machine) and four local helper sessions | The 2.x integration `hass-anycubic` 2.9.4 and library `anycubic-cloud-api` 0.4.32 source, tests and captured fixtures; field notes | `PROTOCOL.md` (Parts A–D), `INTEGRATION-SPEC.md`, this file, `README.md`, `LICENSE`, CI workflows. Credentials named by role only; scanned against the real values: no match | n/a — specification team |
 | 2026-09-28 | Specification | Claude (local) | PR #1 @ `e8f7ad8`, black-box against a real account; the 2.x code for the light-type fact | `ACCEPTANCE.md` (L1, L2); PROTOCOL A §3.7, §4.2 and §4.3 (the rate limit, success code 1), B §2.3.9 (the function names are compatibility data) | n/a — specification team |
+| 2026-09-28 | Specification | Claude (local) | PR #1 @ `e5df26f`, black-box against the live account | L1 and L2 confirmed on hardware; v0.1.0 accepted; similarity and secret scan unchanged | n/a — specification team |
 
 ## Similarity checks
 

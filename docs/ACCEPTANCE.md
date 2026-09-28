@@ -37,3 +37,15 @@ Nothing was written back to the live install.
 **Not tested live yet:** the upload and print paths (they'd start a real print), the Agora stream end to end
 (it needs a browser offer; this will be tested through the integration), firmware update (it would update the
 printer), and reconnect/backoff under a real outage.
+
+## Round 2 re-test — 2026-09-28, `clean/implementation-v0.1.0` @ `e5df26f`
+
+Re-tested live against the same account.
+
+- **L1 confirmed fixed.** `set_light()` with no `light_type` sent the type the printer had reported, and the printer answered
+  `light/control` **done** for both off and on.
+- **L2 confirmed fixed.** `sign_in_any()` followed at once by a fresh client from the entry alone, with no pause in between, signs in.
+  Previously this ended in `CredentialsRejectedError`.
+- The similarity check is unchanged (see `CLEAN-ROOM.md`), and the secret scan found no hits in 38 files.
+
+**Result: v0.1.0 accepted.**
