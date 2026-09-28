@@ -44,12 +44,24 @@ def test_order_body_defaults() -> None:
         "data": None,
     }
     assert build_order_body(5, 103) == {
-        "order_id": 103, "printer_id": 5, "project_id": 0, "data": {}}  # fmt: skip
+        "order_id": 103,
+        "printer_id": 5,
+        "project_id": 0,
+        "data": {},
+    }
     assert build_order_body(5, 1) == {
-        "order_id": 1, "printer_id": 5, "project_id": 0, "data": None,
-        "ams_info": None, "settings": None}  # fmt: skip
+        "order_id": 1,
+        "printer_id": 5,
+        "project_id": 0,
+        "data": None,
+        "ams_info": None,
+        "settings": None,
+    }
     assert build_order_body(5, 1001) == {
-        "order_id": "1001", "printer_id": 5, "shengwang_rtc_support": True}  # fmt: skip
+        "order_id": "1001",
+        "printer_id": 5,
+        "shengwang_rtc_support": True,
+    }
 
 
 # -- slot mapping (PROTOCOL D §2.4) -------------------------------------------------------
@@ -58,13 +70,24 @@ def test_order_body_defaults() -> None:
 def _units(first_id: int = 0) -> tuple:  # type: ignore[type-arg]
     return parse_ace_units(
         [
-            {"id": first_id, "slots": [
-                {"index": 0, "color": [10, 10, 10]}, {"index": 1, "color": [11, 11, 11]},
-                {"index": 2, "color": [12, 12, 12]}, {"index": 3, "color": [13, 13, 13]}]},
-            {"id": first_id + 1, "slots": [
-                {"index": 0, "color": [20, 20, 20]}, {"index": 2, "color": [22, 22, 22]}]},
+            {
+                "id": first_id,
+                "slots": [
+                    {"index": 0, "color": [10, 10, 10]},
+                    {"index": 1, "color": [11, 11, 11]},
+                    {"index": 2, "color": [12, 12, 12]},
+                    {"index": 3, "color": [13, 13, 13]},
+                ],
+            },
+            {
+                "id": first_id + 1,
+                "slots": [
+                    {"index": 0, "color": [20, 20, 20]},
+                    {"index": 2, "color": [22, 22, 22]},
+                ],
+            },
         ]
-    )  # fmt: skip
+    )
 
 
 def _colors(*indexes: int) -> list[PaintInfo]:
@@ -81,7 +104,8 @@ def test_mapping_works_with_either_first_box_id(first_id: int) -> None:
     assert [(m.paint_index, m.ams_index) for m in mapping] == [(0, 1), (1, 6), (2, 4)]
     assert mapping[0].ams_color == (11, 11, 11)
     assert mapping[1].ams_color == (22, 22, 22)
-    assert mapping[2].material_type == "M2" and mapping[2].filament_used == 2.5
+    assert mapping[2].material_type == "M2"
+    assert mapping[2].filament_used == 2.5
 
 
 def test_mapping_uses_the_files_paint_colour() -> None:
@@ -122,7 +146,8 @@ def test_validate_slots_and_ams_info() -> None:
         validate_slots([0], ())
     assert ams_info([]) is None
     info = ams_info(build_slot_mapping(_colors(0), [2], _units()))
-    assert info is not None and info["use_ams"] is True
+    assert info is not None
+    assert info["use_ams"] is True
 
 
 # -- G-code header (PROTOCOL D §2.6) -----------------------------------------------------
@@ -159,7 +184,8 @@ def test_parse_header() -> None:
 def test_colors_by_paint_index() -> None:
     colors = gcode_colors(parse_gcode_header(HEADER))
     petg, pla = colors
-    assert petg.paint.paint_index == 1 and petg.paint.filament_used == 1.1
+    assert petg.paint.paint_index == 1
+    assert petg.paint.filament_used == 1.1
     assert petg.filament_used_mm == 300
     assert petg.filament_used_cm3 is None  # the cm3 list is shorter
     assert petg.raw["extra"] is True

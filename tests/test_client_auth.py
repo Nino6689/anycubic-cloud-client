@@ -261,7 +261,8 @@ async def test_android_without_device_id_makes_one(
     client = make_client(http, secrets, mode=AuthMode.ANDROID)
     await client.check()
     device = client.token_state.device_id
-    assert device is not None and len(device) == 33
+    assert device is not None
+    assert len(device) == 33
     assert http.calls[0].headers["XX-Device-Id"] == device
     assert client.tokens_changed
 

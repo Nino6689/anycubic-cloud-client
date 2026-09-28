@@ -341,6 +341,7 @@ def parse_cloud_message(
         return None
     kind = as_str(message.get("type"))
     if not kind:
+        # Required by 2.x (an ERROR there); logged quietly here (Q15).
         _LOGGER.debug("Printer message without a type on %s", redact_topic(topic_text))
         return None
     action = as_str(message.get("action"))

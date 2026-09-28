@@ -390,6 +390,9 @@ class AnycubicCloudClient:
                 "The Anycubic cloud answered 'request error' "
                 "(maintenance or rate limit)"
             )
+        # 1007 is only recorded on printer calls; it is checked on every call,
+        # the conservative side: "not ready", never re-authentication (Q9).
+        # Success is never judged by ``code``, only by ``data`` (Q4).
         if code == CODE_PRINTER_REMOVED:
             raise PrinterRemovedError(
                 msg or "The printer has been removed from the cloud"

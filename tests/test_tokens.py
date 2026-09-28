@@ -76,7 +76,9 @@ def test_token_state_export_and_repr() -> None:
         "auth_mode": 3,
     }
     text = repr(state)
-    assert "user-tok" not in text and "access-tok" not in text and "zz-9" not in text
+    assert "user-tok" not in text
+    assert "access-tok" not in text
+    assert "zz-9" not in text
     assert "SLICER" in text
     assert "None" in repr(TokenState())
 
@@ -144,12 +146,17 @@ def test_decode_claims() -> None:
     assert not claims.is_wrong_type
     assert not claims.is_expired(now)
     left = claims.seconds_left(now)
-    assert left is not None and 99 <= left <= 100
+    assert left is not None
+    assert 99 <= left <= 100
     expired = decode_claims(make_jwt({"exp": int(now) - 1, "tokenType": "user"}))
-    assert expired is not None and expired.is_expired() and expired.is_wrong_type
+    assert expired is not None
+    assert expired.is_expired()
+    assert expired.is_wrong_type
     no_exp = decode_claims(make_jwt({"exp": "soon", "iss": 5}))
     assert no_exp is not None
-    assert no_exp.exp is None and no_exp.issuer is None and not no_exp.is_expired()
+    assert no_exp.exp is None
+    assert no_exp.issuer is None
+    assert not no_exp.is_expired()
     assert no_exp.seconds_left() is None
 
 
@@ -170,7 +177,8 @@ def test_valid_signature(key: rsa.RSAPrivateKey) -> None:
     assert result.status is SignatureStatus.VALID
     assert result.acceptable
     assert result.token == token
-    assert "valid" in repr(result) and token not in repr(result)
+    assert "valid" in repr(result)
+    assert token not in repr(result)
 
 
 def test_over_long_signature_is_trimmed(key: rsa.RSAPrivateKey) -> None:

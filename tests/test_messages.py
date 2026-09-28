@@ -64,7 +64,8 @@ def test_dropped_messages() -> None:
     assert parse_cloud_message("short/topic", mqtt("fan", "auto", "done")) is None
     # a response with more than one key is processed
     reply = parse_cloud_message(RESPONSE, mqtt("light", "control", "done", {"type": 2}))
-    assert reply is not None and reply.printer_key == PRINTER_KEY
+    assert reply is not None
+    assert reply.printer_key == PRINTER_KEY
 
 
 def test_decode_payload() -> None:
@@ -77,14 +78,17 @@ def test_decode_payload() -> None:
 
 def test_envelope_and_fault() -> None:
     message = parse(mqtt("fan", "auto", "done", {"fan_speed_pct": 10}))
-    assert message.code == 200 and message.fault is None
-    assert message.msgid == "fake-msgid" and message.msg == "done"
+    assert message.code == 200
+    assert message.fault is None
+    assert message.msgid == "fake-msgid"
+    assert message.msg == "done"
     assert message.data == {"fan_speed_pct": 10}
     assert PRINTER_KEY not in repr(message)
     zero = parse(mqtt("fan", "auto", "done", {}, code=0))
     assert zero.fault is None
     boolean = parse({**mqtt("fan", "auto", "done", {}), "code": True})
-    assert boolean.fault is None and boolean.code is None
+    assert boolean.fault is None
+    assert boolean.code is None
 
 
 def test_fault_kept_when_not_understood() -> None:
@@ -148,10 +152,13 @@ def test_print_printing() -> None:
     assert update.work_status is WorkStatus.BUSY
     assert update.job_status is JobStatus.PRINTING
     assert update.download_progress == 0
-    assert update.task_id == 900001 and update.task_id_present
+    assert update.task_id == 900001
+    assert update.task_id_present
     assert update.job is not None
-    assert update.job.progress == 42 and update.job.current_layer == 57
-    assert update.job.supplies_usage == 5210 and update.job.filename == "benchy.gcode"
+    assert update.job.progress == 42
+    assert update.job.current_layer == 57
+    assert update.job.supplies_usage == 5210
+    assert update.job.filename == "benchy.gcode"
     assert update.applies_to(900001)
     assert not update.applies_to(1)
     assert not update.applies_to(None)
@@ -190,7 +197,8 @@ def test_print_downloading() -> None:
     assert update.download_progress == 33
     assert update.job is None  # no job fields while downloading
     checking = _print("start", "checking", {"taskid": 77})
-    assert checking.download_progress == 0 and checking.job is None
+    assert checking.download_progress == 0
+    assert checking.job is None
 
 
 def test_print_failed() -> None:
@@ -217,20 +225,24 @@ def test_print_updated() -> None:
         },
     }
     update = _print("update", "updated", data)
-    assert update.work_status is None and update.job_status is None
+    assert update.work_status is None
+    assert update.job_status is None
     assert (update.nozzle_temp, update.hotbed_temp) == (219, 60)
-    assert update.fan_speed_pct == 100 and update.print_speed_pct == 100
+    assert update.fan_speed_pct == 100
+    assert update.print_speed_pct == 100
     assert update.print_speed_mode == 2
     assert (update.target_nozzle_temp, update.target_hotbed_temp) == (220, 60)
     partial = _print("start", "updated", {"curr_nozzle_temp": 200, "settings": None})
-    assert partial.nozzle_temp is None and partial.hotbed_temp is None
+    assert partial.nozzle_temp is None
+    assert partial.hotbed_temp is None
     one_target = _print("update", "updated", {"settings": {"target_nozzle_temp": 1}})
     assert one_target.target_nozzle_temp is None
 
 
 def test_print_slice_param() -> None:
     update = _print("getSliceParam", "done", {"slice_param": '{"image_id": "x.png"}'})
-    assert update.slice_param is not None and update.slice_param.image_id == "x.png"
+    assert update.slice_param is not None
+    assert update.slice_param.image_id == "x.png"
 
 
 @pytest.mark.parametrize(
@@ -247,17 +259,20 @@ def test_print_without_action_is_not_understood() -> None:
 
 def test_print_task_rule() -> None:
     no_task = _print("start", "printing", {"progress": 1})
-    assert no_task.task_id is None and not no_task.task_id_present
+    assert no_task.task_id is None
+    assert not no_task.task_id_present
     assert no_task.applies_to(5)
     text_task = _print("start", "printing", {"taskid": "abc"})
-    assert text_task.task_id_present and text_task.applies_to(5)
+    assert text_task.task_id_present
+    assert text_task.applies_to(5)
     negative = _print("start", "printing", {"taskid": -1})
     assert negative.applies_to(5)
 
 
 def test_print_null_data() -> None:
     update = _print("start", "printing", None)
-    assert update.job_status is JobStatus.PRINTING and update.job is None
+    assert update.job_status is JobStatus.PRINTING
+    assert update.job is None
     downloading = _print("start", "downloading", None)
     assert downloading.job_status is JobStatus.DOWNLOADING
     assert downloading.download_progress is None
@@ -278,7 +293,7 @@ def test_temperature() -> None:
                 "target_hotbed_temp": 60,
                 "target_nozzle_temp": 220,
             },
-        )  # fmt: skip
+        )
     )
     assert isinstance(message.report, TemperatureReport)
     assert message.report.temperatures.nozzle == 218
@@ -287,7 +302,8 @@ def test_temperature() -> None:
 
 def test_fan_light_peripherals() -> None:
     fan = parse(mqtt("fan", "auto", "done", {"fan_speed_pct": 50, "box_fan_level": 2}))
-    assert isinstance(fan.report, FanReport) and fan.report.fans.box_fan_level == 2
+    assert isinstance(fan.report, FanReport)
+    assert fan.report.fans.box_fan_level == 2
     lights = parse(
         mqtt(
             "light",
@@ -296,11 +312,13 @@ def test_fan_light_peripherals() -> None:
             {"lights": [{"type": 2, "status": 1, "brightness": 100}]},
         )
     )
-    assert isinstance(lights.report, LightReport) and lights.report.full_list
+    assert isinstance(lights.report, LightReport)
+    assert lights.report.full_list
     single = parse(
         mqtt("light", "control", "done", {"type": 2, "status": 0, "brightness": 0})
     )
-    assert isinstance(single.report, LightReport) and not single.report.full_list
+    assert isinstance(single.report, LightReport)
+    assert not single.report.full_list
     assert not parse(mqtt("light", "control", "failed", {"type": 2})).understood
     peripherals = parse(
         mqtt(
@@ -323,15 +341,15 @@ def test_axis() -> None:
         )
     )
     assert isinstance(query.report, AxisReport)
-    assert (
-        query.report.position is not None
-        and query.report.position.z == 3.8152532726237904
-    )
+    assert query.report.position is not None
+    assert query.report.position.z == 3.8152532726237904
     move = parse(mqtt("axis", "move", "doing"))
     assert move.update == AxisMoveUpdate("doing")
-    assert isinstance(move.update, AxisMoveUpdate) and move.update.moving
+    assert isinstance(move.update, AxisMoveUpdate)
+    assert move.update.moving
     refused = AxisMoveUpdate("failed")
-    assert refused.refused and not refused.moving
+    assert refused.refused
+    assert not refused.moving
     assert not AxisMoveUpdate("done").moving
     assert not parse(mqtt("axis", "turnOff", "done")).understood
 
@@ -340,16 +358,16 @@ def test_ace_get_info_list_and_single_object() -> None:
     message = parse(mqtt("multiColorBox", "getInfo", "success", ACE_GET_INFO_DATA))
     assert isinstance(message.report, MultiColorBoxReport)
     assert message.report.is_full_list
-    assert (
-        message.report.boxes is not None and message.report.boxes[0].model_id == 40001
-    )
+    assert message.report.boxes is not None
+    assert message.report.boxes[0].model_id == 40001
     single = {
         "multi_color_box": ACE_GET_INFO_DATA["multi_color_box"][0],
         "head_tools_model": 0,
     }
     one = parse(mqtt("multiColorBox", "getInfo", "success", single))
     assert isinstance(one.report, MultiColorBoxReport)
-    assert one.report.boxes is not None and len(one.report.boxes) == 1
+    assert one.report.boxes is not None
+    assert len(one.report.boxes) == 1
 
 
 def test_ace_auto_update_info_flat() -> None:
@@ -366,7 +384,7 @@ def test_ace_auto_update_info_flat() -> None:
             "autoUpdateInfo",
             "done",
             {"multi_color_box": [{"id": 0, "loaded_slot": 1}]},
-        )  # fmt: skip
+        )
     )
     assert listed.update is None
 
@@ -383,8 +401,20 @@ def test_ace_auto_update_info_flat() -> None:
     ],
 )
 def test_ace_partial_actions(action: str) -> None:
-    data = {"multi_color_box": [{"id": 0, "temp": 44,
-            "drying_status": {"status": 1, "target_temp": 45, "duration": 240, "remain_time": 212}}]}  # fmt: skip
+    data = {
+        "multi_color_box": [
+            {
+                "id": 0,
+                "temp": 44,
+                "drying_status": {
+                    "status": 1,
+                    "target_temp": 45,
+                    "duration": 240,
+                    "remain_time": 212,
+                },
+            }
+        ]
+    }
     message = parse(mqtt("multiColorBox", action, "success", data))
     assert message.understood
     assert isinstance(message.report, MultiColorBoxReport)
@@ -408,7 +438,7 @@ def test_extfilbox() -> None:
                 "status_type": 2,
                 "current_status": 11,
             },
-        )  # fmt: skip
+        )
     )
     assert message.update == ExternalHolderUpdate("PLA", (1, 2, 3), True, 2, 11)
     assert isinstance(message.report, ExternalFilamentBoxReport)
@@ -431,11 +461,13 @@ def test_ai_settings_and_info() -> None:
                     "sensitivity_level": [1, 1],
                 }
             },
-        )  # fmt: skip
+        )
     )
-    assert isinstance(ai.report, AiSettingsReport) and ai.report.settings.status == 3
+    assert isinstance(ai.report, AiSettingsReport)
+    assert ai.report.settings.status == 3
     info = parse(mqtt("info", "query", "done", {"state": "free"}))
-    assert isinstance(info.report, InfoReport) and info.report.printer_state == "free"
+    assert isinstance(info.report, InfoReport)
+    assert info.report.printer_state == "free"
 
 
 # -- file (PROTOCOL C §4.12) --------------------------------------------------------------------
@@ -475,7 +507,8 @@ def test_file_other_actions() -> None:
         FileSource.UDISK
     )
     recommend = parse(mqtt("file", "cloudRecommendList", "done", {"anything": 1}))
-    assert recommend.understood and recommend.update is None
+    assert recommend.understood
+    assert recommend.update is None
     assert not parse(mqtt("file", "fileDetails", "done")).understood
 
 
@@ -483,8 +516,11 @@ def test_file_other_actions() -> None:
 
 
 def test_printer_ota() -> None:
-    version = parse(mqtt("ota", "reportVersion", "done", {"firmware_version": "2.8.0",
-                                                          "model_id": 1}))  # fmt: skip
+    version = parse(
+        mqtt(
+            "ota", "reportVersion", "done", {"firmware_version": "2.8.0", "model_id": 1}
+        )
+    )
     assert version.update == FirmwareReport(FirmwareStep.VERSION, version="2.8.0")
     assert parse(mqtt("ota", "update", "start")).update == FirmwareReport(
         FirmwareStep.START
@@ -514,7 +550,8 @@ def test_ace_ota_topic() -> None:
     odd = parse(
         mqtt("ota", "update", "update-success"), f"{PUBLIC}/multiColorBox/report/x"
     )
-    assert isinstance(odd.update, FirmwareReport) and odd.update.box_index == 0
+    assert isinstance(odd.update, FirmwareReport)
+    assert odd.update.box_index == 0
 
 
 # -- events ------------------------------------------------------------------------------
@@ -526,7 +563,8 @@ def test_events(kind: str) -> None:
     message = parse(mqtt(kind, "report", "done", data, code=10107, msg="filament"))
     assert isinstance(message.update, PrinterEvent)
     assert message.update.data == data
-    assert message.fault is not None and message.fault.code == 10107
+    assert message.fault is not None
+    assert message.fault.code == 10107
     assert parse(mqtt(kind, "x", "y", None)).update == PrinterEvent({})
 
 
@@ -563,8 +601,14 @@ def test_null_data_is_tolerated(kind: str, action: str, state: str) -> None:
 
 
 def test_null_fields_never_clear_known_state() -> None:
-    temps = parse(mqtt("tempature", "auto", "done", {"curr_nozzle_temp": None,
-                                                     "curr_hotbed_temp": 60}))  # fmt: skip
+    temps = parse(
+        mqtt(
+            "tempature",
+            "auto",
+            "done",
+            {"curr_nozzle_temp": None, "curr_hotbed_temp": 60},
+        )
+    )
     assert isinstance(temps.report, TemperatureReport)
     assert temps.report.temperatures.nozzle is None  # None = "keep", never 0
     boxes = parse(
@@ -573,10 +617,11 @@ def test_null_fields_never_clear_known_state() -> None:
             "getInfo",
             "success",
             {"multi_color_box": [{"id": 0, "temp": None, "slots": None}]},
-        )  # fmt: skip
+        )
     )
     assert isinstance(boxes.report, MultiColorBoxReport)
-    assert boxes.report.boxes is not None and boxes.report.boxes[0].temp is None
+    assert boxes.report.boxes is not None
+    assert boxes.report.boxes[0].temp is None
 
 
 def test_parser_errors_do_not_escape(monkeypatch: pytest.MonkeyPatch) -> None:

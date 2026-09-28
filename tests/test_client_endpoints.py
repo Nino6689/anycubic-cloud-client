@@ -252,49 +252,214 @@ async def test_every_order_shape(http: FakeSession, secrets: CloudSecrets) -> No
         {"type": 1, "count": 30, "sensitivity_level": (2, 2), "notice_type": None},
     )
     assert order_bodies(http) == [
-        {"order_id": 2, "printer_id": p, "project_id": 77, "data": None, "ams_info": None, "settings": None},
-        {"order_id": 3, "printer_id": p, "project_id": 77, "data": None, "ams_info": None, "settings": None},
-        {"order_id": 4, "printer_id": p, "project_id": 77, "data": None, "ams_info": None, "settings": None},
-        {"order_id": "1233", "printer_id": p, "data": {"type": 1, "status": 1, "brightness": 100}},
-        {"order_id": 1233, "printer_id": p, "project_id": 77, "data": {"type": 2, "status": 0, "brightness": 0}},
-        {"order_id": "1233", "printer_id": p, "data": {"type": 2, "status": 1, "brightness": 40}},
-        {"order_id": "1216", "printer_id": p, "data": {"type": 0, "target_nozzle_temp": 230, "target_hotbed_temp": 0}},
-        {"order_id": "1216", "printer_id": p, "data": {"type": 1, "target_nozzle_temp": 0, "target_hotbed_temp": 90}},
-        {"order_id": "1216", "printer_id": p, "data": {"type": 2, "target_nozzle_temp": 200, "target_hotbed_temp": 60}},
+        {
+            "order_id": 2,
+            "printer_id": p,
+            "project_id": 77,
+            "data": None,
+            "ams_info": None,
+            "settings": None,
+        },
+        {
+            "order_id": 3,
+            "printer_id": p,
+            "project_id": 77,
+            "data": None,
+            "ams_info": None,
+            "settings": None,
+        },
+        {
+            "order_id": 4,
+            "printer_id": p,
+            "project_id": 77,
+            "data": None,
+            "ams_info": None,
+            "settings": None,
+        },
+        {
+            "order_id": "1233",
+            "printer_id": p,
+            "data": {"type": 1, "status": 1, "brightness": 100},
+        },
+        {
+            "order_id": 1233,
+            "printer_id": p,
+            "project_id": 77,
+            "data": {"type": 2, "status": 0, "brightness": 0},
+        },
+        {
+            "order_id": "1233",
+            "printer_id": p,
+            "data": {"type": 2, "status": 1, "brightness": 40},
+        },
+        {
+            "order_id": "1216",
+            "printer_id": p,
+            "data": {"type": 0, "target_nozzle_temp": 230, "target_hotbed_temp": 0},
+        },
+        {
+            "order_id": "1216",
+            "printer_id": p,
+            "data": {"type": 1, "target_nozzle_temp": 0, "target_hotbed_temp": 90},
+        },
+        {
+            "order_id": "1216",
+            "printer_id": p,
+            "data": {"type": 2, "target_nozzle_temp": 200, "target_hotbed_temp": 60},
+        },
         {"order_id": "1221", "printer_id": p, "data": {"fan_speed_pct": 50}},
         {"order_id": "1221", "printer_id": p, "data": {"aux_fan_speed_pct": 20}},
         {"order_id": "1221", "printer_id": p, "data": {"box_fan_level": 1}},
-        {"order_id": "201", "printer_id": p, "data": {"axis": 1, "move_type": 1, "distance": 15}},
-        {"order_id": "201", "printer_id": p, "data": {"axis": 4, "move_type": 2, "distance": 0}},
+        {
+            "order_id": "201",
+            "printer_id": p,
+            "data": {"axis": 1, "move_type": 1, "distance": 15},
+        },
+        {
+            "order_id": "201",
+            "printer_id": p,
+            "data": {"axis": 4, "move_type": 2, "distance": 0},
+        },
         {"order_id": "1213", "printer_id": p, "data": None},
         {"order_id": 1214, "printer_id": p, "project_id": 0},
         {"order_id": "1231", "printer_id": p},
         {"order_id": "1232", "printer_id": p},
         {"order_id": 1206, "printer_id": p, "project_id": 0},
-        {"order_id": 1207, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 1, "drying_status": {"status": 1, "target_temp": 55, "duration": 240, "remain_time": None}}]}},
-        {"order_id": 1207, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 0, "drying_status": {"status": 0, "target_temp": 40, "duration": 0, "remain_time": None}},
-            {"id": 1, "drying_status": {"status": 0, "target_temp": 40, "duration": 0, "remain_time": None}}]}},
-        {"order_id": 1208, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 1, "feed_status": {"slot_index": 2, "type": 1}}]}},
-        {"order_id": 1208, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 0, "feed_status": {"slot_index": -1, "type": 2}}]}},
-        {"order_id": 1208, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 0, "feed_status": {"slot_index": 3, "type": 3}}]}},
-        {"order_id": 1211, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 0, "slots": [{"index": 1, "color": [255, 0, 0], "type": "PLA SE"}]}]}},
-        {"order_id": 1212, "printer_id": p, "project_id": 0, "data": {"multi_color_box": [
-            {"id": 1, "auto_feed": 1}]}},
+        {
+            "order_id": 1207,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {
+                        "id": 1,
+                        "drying_status": {
+                            "status": 1,
+                            "target_temp": 55,
+                            "duration": 240,
+                            "remain_time": None,
+                        },
+                    }
+                ]
+            },
+        },
+        {
+            "order_id": 1207,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {
+                        "id": 0,
+                        "drying_status": {
+                            "status": 0,
+                            "target_temp": 40,
+                            "duration": 0,
+                            "remain_time": None,
+                        },
+                    },
+                    {
+                        "id": 1,
+                        "drying_status": {
+                            "status": 0,
+                            "target_temp": 40,
+                            "duration": 0,
+                            "remain_time": None,
+                        },
+                    },
+                ]
+            },
+        },
+        {
+            "order_id": 1208,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {"id": 1, "feed_status": {"slot_index": 2, "type": 1}}
+                ]
+            },
+        },
+        {
+            "order_id": 1208,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {"id": 0, "feed_status": {"slot_index": -1, "type": 2}}
+                ]
+            },
+        },
+        {
+            "order_id": 1208,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {"id": 0, "feed_status": {"slot_index": 3, "type": 3}}
+                ]
+            },
+        },
+        {
+            "order_id": 1211,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {
+                "multi_color_box": [
+                    {
+                        "id": 0,
+                        "slots": [{"index": 1, "color": [255, 0, 0], "type": "PLA SE"}],
+                    }
+                ]
+            },
+        },
+        {
+            "order_id": 1212,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {"multi_color_box": [{"id": 1, "auto_feed": 1}]},
+        },
         {"order_id": 103, "printer_id": p, "project_id": 0, "data": {}},
         {"order_id": 101, "printer_id": p, "project_id": 0, "data": {}},
-        {"order_id": 104, "printer_id": p, "project_id": 0, "data": {"filename": "part.gcode", "filetype": -1, "path": "/"}},
-        {"order_id": 102, "printer_id": p, "project_id": 0, "data": {"filename": "usb.gcode", "filetype": -1, "path": "/"}},
-        {"order_id": "1243", "printer_id": p, "data": {"ai_settings": {
-            "status": 3, "type": 2, "count": 60, "sensitivity_level": [1, 1], "notice_type": [0, 1]}}},
-        {"order_id": "1243", "printer_id": p, "data": {"ai_settings": {
-            "status": 0, "type": 1, "count": 30, "sensitivity_level": [2, 2], "notice_type": [0, 1]}}},
-    ]  # fmt: skip
+        {
+            "order_id": 104,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {"filename": "part.gcode", "filetype": -1, "path": "/"},
+        },
+        {
+            "order_id": 102,
+            "printer_id": p,
+            "project_id": 0,
+            "data": {"filename": "usb.gcode", "filetype": -1, "path": "/"},
+        },
+        {
+            "order_id": "1243",
+            "printer_id": p,
+            "data": {
+                "ai_settings": {
+                    "status": 3,
+                    "type": 2,
+                    "count": 60,
+                    "sensitivity_level": [1, 1],
+                    "notice_type": [0, 1],
+                }
+            },
+        },
+        {
+            "order_id": "1243",
+            "printer_id": p,
+            "data": {
+                "ai_settings": {
+                    "status": 0,
+                    "type": 1,
+                    "count": 30,
+                    "sensitivity_level": [2, 2],
+                    "notice_type": [0, 1],
+                }
+            },
+        },
+    ]
 
 
 async def test_order_argument_checks(http: FakeSession, secrets: CloudSecrets) -> None:
@@ -328,11 +493,25 @@ async def test_print_settings(http: FakeSession, secrets: CloudSecrets) -> None:
     )
     await c.set_print_settings(5, 77, {"on_time": 2.5})
     assert order_bodies(http) == [
-        {"order_id": 6, "printer_id": 5, "project_id": 77, "data": {"settings": {"print_speed_mode": 3}}},
-        {"order_id": 6, "printer_id": 5, "project_id": 77,
-         "data": {"settings": {"target_nozzle_temp": 220, "fan_speed_pct": 50}}},
-        {"order_id": 6, "printer_id": 5, "project_id": 77, "data": {"settings": {"on_time": 2.5}}},
-    ]  # fmt: skip
+        {
+            "order_id": 6,
+            "printer_id": 5,
+            "project_id": 77,
+            "data": {"settings": {"print_speed_mode": 3}},
+        },
+        {
+            "order_id": 6,
+            "printer_id": 5,
+            "project_id": 77,
+            "data": {"settings": {"target_nozzle_temp": 220, "fan_speed_pct": 50}},
+        },
+        {
+            "order_id": 6,
+            "printer_id": 5,
+            "project_id": 77,
+            "data": {"settings": {"on_time": 2.5}},
+        },
+    ]
 
 
 @pytest.mark.parametrize(
@@ -363,8 +542,12 @@ def test_print_settings_without_limits_are_refused() -> None:
 def _printer_with_updates() -> PrinterDetail:
     data = detail()
     data["version"] = {**data["version"], "need_update": 1, "target_version": "2.8.0.0"}
-    second = {**data["multi_color_box_version"][0], "box_id": 1, "need_update": 1,
-              "target_version": "1.4.0"}  # fmt: skip
+    second = {
+        **data["multi_color_box_version"][0],
+        "box_id": 1,
+        "need_update": 1,
+        "target_version": "1.4.0",
+    }
     data["multi_color_box_version"] = [data["multi_color_box_version"][0], second]
     return PrinterDetail.from_data(data)
 
@@ -433,14 +616,20 @@ async def test_cloud_files(http: FakeSession, secrets: CloudSecrets) -> None:
 
 
 async def test_storage_quota(http: FakeSession, secrets: CloudSecrets) -> None:
-    quota = {"used_bytes": 10, "total_bytes": 100, "used": "10 B", "total": "100 B",
-             "user_file_exists": True}  # fmt: skip
+    quota = {
+        "used_bytes": 10,
+        "total_bytes": 100,
+        "used": "10 B",
+        "total": "100 B",
+        "user_file_exists": True,
+    }
     http.add(
         "POST", "/work/index/getUserStore", envelope(quota), envelope({"used": "x"})
     )
     c = make_client(http, secrets)
     result = await c.get_storage_quota()
-    assert result.available_bytes == 90 and result.user_file_exists is True
+    assert result.available_bytes == 90
+    assert result.user_file_exists is True
     assert http.calls[0].raw_body == "{}"
     with pytest.raises(UnexpectedResponseError):
         await c.get_storage_quota()
@@ -456,8 +645,15 @@ QUOTA = "/work/index/getUserStore"
 
 
 def _quota(used: int) -> dict[str, Any]:
-    return envelope({"used_bytes": used, "total_bytes": 1000, "used": "", "total": "",
-                     "user_file_exists": True})  # fmt: skip
+    return envelope(
+        {
+            "used_bytes": used,
+            "total_bytes": 1000,
+            "used": "",
+            "total": "",
+            "user_file_exists": True,
+        }
+    )
 
 
 def _upload_routes(http: FakeSession, *, put: Any = None, register: Any = None) -> None:
@@ -606,12 +802,17 @@ async def test_start_print_printer_file(
         "order_id": 1,
         "printer_id": 5,
         "project_id": 0,
-        "data": {"filetype": 1, "file_key": "", "file_name": "",
-                 "task_settings": {"ai_detect": 0, "camera_timelapse": 0},
-                 "filename": "part.gcode", "filepath": "/"},
+        "data": {
+            "filetype": 1,
+            "file_key": "",
+            "file_name": "",
+            "task_settings": {"ai_detect": 0, "camera_timelapse": 0},
+            "filename": "part.gcode",
+            "filepath": "/",
+        },
         "ams_info": None,
         "settings": None,
-    }  # fmt: skip
+    }
     assert second["data"]["filetype"] == 2
     assert second["data"]["filepath"] == "/sub"
     assert second["data"]["task_settings"] == {"ai_detect": 1, "camera_timelapse": 1}
@@ -641,8 +842,16 @@ def _ace_units() -> Any:
     data = detail()
     second = copy.deepcopy(data["multi_color_box"])
     second["id"] = 1
-    second["slots"] = [{"index": 0, "sku": "", "type": "PLA", "color": [1, 2, 3],
-                        "status": 4, "edit_status": 0}]  # fmt: skip
+    second["slots"] = [
+        {
+            "index": 0,
+            "sku": "",
+            "type": "PLA",
+            "color": [1, 2, 3],
+            "status": 4,
+            "edit_status": 0,
+        }
+    ]
     first = data["multi_color_box"]
     first["id"] = 0
     return PrinterDetail.from_data(
@@ -659,18 +868,31 @@ async def test_print_by_gcode_id_with_mapping(
     # colours in file order: paint 1 (PLA) then paint 0 (PETG); slots 4 and 3
     result = await c.print_by_gcode_id(5, 700002, slots=[4, 3], ace_units=_ace_units())
     assert result.cloud_file_id == 700001
-    assert result.saved_in_cloud and result.gcode_id == 700002
+    assert result.saved_in_cloud
+    assert result.gcode_id == 700002
     body = order_bodies(http)[0]
     assert body["data"]["file_id"] == 700001
     assert body["ams_info"] == {
         "ams_box_mapping": [
-            {"ams_color": [239, 240, 241], "ams_index": 3, "filament_used": 12.3,
-             "material_type": "PETG", "paint_color": [239, 240, 241], "paint_index": 0},
-            {"ams_color": [1, 2, 3], "ams_index": 4, "filament_used": 4.1,
-             "material_type": "PLA", "paint_color": [1, 2, 3], "paint_index": 1},
+            {
+                "ams_color": [239, 240, 241],
+                "ams_index": 3,
+                "filament_used": 12.3,
+                "material_type": "PETG",
+                "paint_color": [239, 240, 241],
+                "paint_index": 0,
+            },
+            {
+                "ams_color": [1, 2, 3],
+                "ams_index": 4,
+                "filament_used": 4.1,
+                "material_type": "PLA",
+                "paint_color": [1, 2, 3],
+                "paint_index": 1,
+            },
         ],
         "use_ams": True,
-    }  # fmt: skip
+    }
 
 
 async def test_print_by_gcode_id_errors(
@@ -714,7 +936,8 @@ async def test_upload_and_print_without_cloud_save(
         slots=[0, 3],
         ace_units=_ace_units(),
     )
-    assert not result.saved_in_cloud and result.gcode_id is None
+    assert not result.saved_in_cloud
+    assert result.gcode_id is None
     assert result.cloud_file_id == 700001
     assert [c.paint_index for c in result.colors] == [0, 1]
     body = order_bodies(http)[0]
@@ -730,7 +953,8 @@ async def test_upload_and_print_without_slots(
     http.add("POST", ORDER, OK)
     c = make_client(http, secrets)
     result = await c.upload_and_print(5, "model.zip", b"raw", save_in_cloud=False)
-    assert result.mapping == () and order_bodies(http)[0]["ams_info"] is None
+    assert result.mapping == ()
+    assert order_bodies(http)[0]["ams_info"] is None
 
 
 async def test_upload_and_print_rejects_before_uploading(
@@ -760,9 +984,14 @@ async def test_upload_and_print_saved_in_cloud(
     http.add("POST", ORDER, OK)
     c = make_client(http, secrets)
     result = await c.upload_and_print(5, "benchy.gcode", b"x" * 50, save_in_cloud=True)
-    assert result.saved_in_cloud and result.gcode_id == 700002
+    assert result.saved_in_cloud
+    assert result.gcode_id == 700002
     assert http.calls_to("/work/index/files")[0].body == {
-        "page": 1, "limit": 10, "printable": 1, "machine_type": 0}  # fmt: skip
+        "page": 1,
+        "limit": 10,
+        "printable": 1,
+        "machine_type": 0,
+    }
     assert order_bodies(http)[0]["data"]["is_delete_file"] == 0
 
 

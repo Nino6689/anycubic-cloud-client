@@ -509,6 +509,7 @@ class CloudMqttClient:
             return
         info = parse_topic(topic)
         if info.is_user_topic:
+            # Account slicing reports: only logged, as in 2.x (Q10).
             _LOGGER.debug("User message on %s", redact_topic(topic))
             return
         if info.printer_key not in self.printers:

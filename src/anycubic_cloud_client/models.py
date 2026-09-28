@@ -128,7 +128,7 @@ _KG_RE = re.compile(r"(\d+(?:\.\d+)?)kg", re.IGNORECASE)
 
 
 def parse_duration_minutes(value: object) -> Number | None:
-    """Lifetime/total print time in minutes (PROTOCOL B §2.3.2, §10 Q8).
+    """Lifetime/total print time in minutes (PROTOCOL B §2.3.2, quirk B §10 Q8).
 
     A plain number in text is minutes (may be fractional); ``<h>hour<m>min``
     is converted. A JSON number is accepted as minutes too. Anything else is
@@ -429,7 +429,7 @@ def _default[T](value: T | None, default: T) -> T:
 
 
 def parse_ace_units(value: object) -> tuple[AceUnit, ...]:
-    """``multi_color_box``: one object for a single ACE, a list for several (Q4)."""
+    """``multi_color_box``: an object for one ACE, a list for several (B §10 Q4)."""
     raw = [value] if isinstance(value, Mapping) else as_list(value)
     units: list[AceUnit] = []
     for position, entry in enumerate(e for e in raw if isinstance(e, Mapping)):

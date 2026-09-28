@@ -10,9 +10,8 @@ import datetime as dt
 import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import aiohttp
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -20,6 +19,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from anycubic_cloud_client import AnycubicCloudClient, AuthMode, CloudSecrets, Region
+
+if TYPE_CHECKING:
+    import aiohttp
 
 API = "https://cloud-universe.anycubic.com/p/p/workbench/api"
 API_CN = "https://cloud-platform.anycubicloud.com/p/p/workbench/api"

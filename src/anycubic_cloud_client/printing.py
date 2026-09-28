@@ -18,7 +18,10 @@ SLOTS_PER_ACE = 4
 
 @dataclass(frozen=True, slots=True)
 class TaskSettings:
-    """``task_settings`` of order 1; both default to 0 as in 2.x (D §2.2)."""
+    """``task_settings`` of order 1; both default to 0 as in 2.x (D §2.2).
+
+    No other print-time option is sent: their names are unknown (Q13).
+    """
 
     ai_detect: int = 0
     camera_timelapse: int = 0

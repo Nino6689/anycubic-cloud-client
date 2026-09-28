@@ -12,15 +12,19 @@ def report(step: FirmwareStep, **kw: object) -> FirmwareReport:
 
 def test_progress_formula() -> None:
     progress = FirmwareProgress(installed_version="1.0")
-    assert progress.percent is None and not progress.in_progress
+    assert progress.percent is None
+    assert not progress.in_progress
     progress.apply_report(report(FirmwareStep.START), now=0)
-    assert progress.in_progress and progress.percent == 1
+    assert progress.in_progress
+    assert progress.percent == 1
     progress.apply_report(report(FirmwareStep.DOWNLOADING, download_progress=42), now=1)
-    assert progress.downloading and progress.percent == 21
+    assert progress.downloading
+    assert progress.percent == 21
     progress.apply_report(report(FirmwareStep.DOWNLOADING), now=2)
     assert progress.download_percent == 42
     progress.apply_report(report(FirmwareStep.UPDATING, install_progress=30), now=3)
-    assert not progress.downloading and progress.percent == 65
+    assert not progress.downloading
+    assert progress.percent == 65
     progress.apply_report(report(FirmwareStep.UPDATING, install_progress=100), now=4)
     assert progress.percent == 100
     progress.apply_report(report(FirmwareStep.UPDATING), now=5)
@@ -35,9 +39,11 @@ def test_report_version_ends_the_update() -> None:
     progress.apply_report(report(FirmwareStep.VERSION, version="1.0"), now=1)
     assert progress.in_progress  # same version: still updating
     progress.apply_report(report(FirmwareStep.VERSION, version="2.0"), now=2)
-    assert not progress.in_progress and progress.percent is None
+    assert not progress.in_progress
+    assert progress.percent is None
     assert progress.installed_version == "2.0"
-    assert progress.download_percent == 0 and progress.install_percent == 0
+    assert progress.download_percent == 0
+    assert progress.install_percent == 0
 
 
 def test_cloud_refresh_first_still_clears() -> None:
@@ -61,7 +67,8 @@ def test_first_version_seen_while_updating() -> None:
     progress = FirmwareProgress()
     progress.apply_report(report(FirmwareStep.START), now=0)
     progress.apply_installed("1.0")  # nothing known before: just record it
-    assert progress.in_progress and progress.installed_version == "1.0"
+    assert progress.in_progress
+    assert progress.installed_version == "1.0"
 
 
 def test_timeout() -> None:

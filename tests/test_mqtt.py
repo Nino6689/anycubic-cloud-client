@@ -43,7 +43,8 @@ from anycubic_cloud_client.mqtt_identity import (
 from anycubic_cloud_client.signing import md5_hex
 
 from .conftest import FakeSession, Material, make_client
-from .payloads import MACHINE_TYPE, PRINTER_KEY, mqtt as message
+from .payloads import MACHINE_TYPE, PRINTER_KEY
+from .payloads import mqtt as message
 
 EMAIL = "someone@example.invalid"
 ACCOUNT = Account(user_id=424242, email=EMAIL, mobile=None)
@@ -67,9 +68,8 @@ def test_slicer_identity(secrets: CloudSecrets, material: Material) -> None:
     assert identity.username.startswith("user|pcf|")
     assert (role, sep_user) == ("pcf", EMAIL)
     assert sig == md5_hex(identity.client_id + identity.password + identity.client_id)
-    assert "USER-TOKEN" not in repr(identity) and identity.password not in repr(
-        identity
-    )
+    assert "USER-TOKEN" not in repr(identity)
+    assert identity.password not in repr(identity)
     # randomised: a new password every time
     again = build_identity(AuthMode.SLICER, "USER-TOKEN", ACCOUNT, secrets)
     assert again.password != identity.password
@@ -80,7 +80,8 @@ def test_android_identity(secrets: CloudSecrets) -> None:
     identity = build_identity(AuthMode.ANDROID, "TOK", account, secrets)
     assert identity.client_id == md5_hex("+000")
     assert identity.username.startswith("user|app|+000|")
-    assert identity.password.startswith("$2b$12$") and len(identity.password) == 60
+    assert identity.password.startswith("$2b$12$")
+    assert len(identity.password) == 60
     assert bcrypt.checkpw(md5_hex("TOK").encode(), identity.password.encode())
     assert android_password("TOK") != android_password("TOK")
 
@@ -141,15 +142,17 @@ def test_topic_parsing_and_redaction() -> None:
     info = parse_topic(
         f"anycubic/anycubicCloud/v1/printer/app/1/{PRINTER_KEY}/response"
     )
-    assert (
-        info.printer_key == PRINTER_KEY and info.is_response and not info.is_user_topic
-    )
-    assert not info.is_ace and info.ace_box_index == 0
+    assert info.printer_key == PRINTER_KEY
+    assert info.is_response
+    assert not info.is_user_topic
+    assert not info.is_ace
+    assert info.ace_box_index == 0
     assert parse_topic("a/b").printer_key is None
     redacted = redact_topic(
         f"anycubic/anycubicCloud/v1/printer/public/1/{PRINTER_KEY}/fan"
     )
-    assert PRINTER_KEY not in redacted and "**REDACTED**" in redacted
+    assert PRINTER_KEY not in redacted
+    assert "**REDACTED**" in redacted
     user = redact_topic(user_topics(424242)[0])
     assert "424242" not in user
     assert redact_topic("a/b/c") == "a/b/c"
@@ -305,7 +308,8 @@ async def test_connect_subscribes_everything(
     assert paho.connected_to == ("mqtt-universe.anycubic.com", 8883, 1200)
     assert paho.insecure is False
     assert paho.reconnect_delay == (5, 120)
-    assert paho.context is not None and paho.context.check_hostname
+    assert paho.context is not None
+    assert paho.context.check_hostname
     username, _ = paho.credentials[0]
     assert username.startswith(f"user|pcf|{EMAIL}|")
     (topics,) = paho.subscribed
@@ -314,7 +318,8 @@ async def test_connect_subscribes_everything(
         *printer_topics(MACHINE_TYPE, PRINTER_KEY),
     ]
     assert all(qos == 0 for _, qos in topics)
-    assert h.link.is_connected and h.link.is_running
+    assert h.link.is_connected
+    assert h.link.is_running
     assert h.link.last_error is None
     assert h.link.printers == frozenset({PRINTER_KEY})
     await settle()
@@ -330,9 +335,8 @@ async def test_china_waives_only_the_hostname_check(
     await h.link.connect()
     assert h.paho.insecure is True
     assert h.paho.connected_to == ("mqtt.anycubicloud.com", 8883, 1200)
-    assert (
-        h.paho.context is not None and h.paho.context.verify_mode == ssl.CERT_REQUIRED
-    )
+    assert h.paho.context is not None
+    assert h.paho.context.verify_mode == ssl.CERT_REQUIRED
 
 
 async def test_connect_without_topics(http: FakeSession, secrets: CloudSecrets) -> None:
@@ -359,12 +363,14 @@ async def test_refused_login_is_a_clear_error(
     h.prepare = lambda c: setattr(c, "connack", [135])
     with pytest.raises(MqttAuthError, match="refused the login"):
         await h.link.connect()
-    assert not h.link.is_running and h.paho.loop_stopped
+    assert not h.link.is_running
+    assert h.paho.loop_stopped
     assert isinstance(h.link.last_error, MqttAuthError)
     # a failed attempt never blocks the next one
     h.prepare = None
     await h.link.connect()
-    assert h.link.is_connected and h.link.last_error is None
+    assert h.link.is_connected
+    assert h.link.last_error is None
 
 
 async def test_other_refusal_is_a_connection_error(
@@ -373,7 +379,7 @@ async def test_other_refusal_is_a_connection_error(
     h = make_link(http, secrets)
     h.prepare = lambda c: setattr(c, "connack", [136])  # server unavailable
     with pytest.raises(
-        MqttConnectionError, match="host=mqtt-universe.anycubic.com:8883"
+        MqttConnectionError, match=r"host=mqtt-universe\.anycubic\.com:8883"
     ):
         await h.link.connect()
 
@@ -391,7 +397,8 @@ async def test_wrong_port_times_out(http: FakeSession, secrets: CloudSecrets) ->
     h.prepare = lambda c: setattr(c, "hang", True)
     with pytest.raises(MqttConnectionError, match="timed out"):
         await h.link.connect(timeout=0.05)
-    assert h.paho.loop_stopped and not h.link.is_running
+    assert h.paho.loop_stopped
+    assert not h.link.is_running
 
 
 async def test_broker_closes_during_connect(
@@ -468,8 +475,10 @@ async def test_routing(
     await h.link.connect()
     base = f"anycubic/anycubicCloud/v1/printer/public/{MACHINE_TYPE}"
     caplog.set_level(logging.DEBUG, logger="anycubic_cloud_client")
-    h.paho.deliver(f"{base}/{PRINTER_KEY}/fan/report",
-                   json.dumps(message("fan", "auto", "done", {"fan_speed_pct": 5})).encode())  # fmt: skip
+    h.paho.deliver(
+        f"{base}/{PRINTER_KEY}/fan/report",
+        json.dumps(message("fan", "auto", "done", {"fan_speed_pct": 5})).encode(),
+    )
     h.paho.deliver(f"{base}/{PRINTER_KEY}/fan/report", b"not json")
     h.paho.deliver(user_topics(424242)[0], b'{"type": "slice"}')
     h.paho.deliver(
@@ -480,8 +489,10 @@ async def test_routing(
         f"anycubic/anycubicCloud/v1/printer/app/{MACHINE_TYPE}/{PRINTER_KEY}/response",
         b'{"msgid": "x"}',
     )
-    h.paho.deliver(f"{base}/{PRINTER_KEY}/video/report",
-                   json.dumps(message("video", "startCapture", "done")).encode())  # fmt: skip
+    h.paho.deliver(
+        f"{base}/{PRINTER_KEY}/video/report",
+        json.dumps(message("video", "startCapture", "done")).encode(),
+    )
     await settle()
     assert len(h.raw) == 6
     assert [m.kind for m in h.messages] == ["fan", "video"]
@@ -527,7 +538,8 @@ async def test_unexpected_disconnect_recomputes_login(
     paho = h.paho
     paho.drop()
     await settle()
-    assert not h.link.is_connected and h.link.is_running
+    assert not h.link.is_connected
+    assert h.link.is_running
     assert h.events == [(True, None), (False, None)]
     assert len(paho.credentials) == 2  # worked out again before the reconnect
     assert paho.credentials[0][1] != paho.credentials[1][1]
@@ -574,7 +586,8 @@ async def test_repeated_refusal_after_reconnect_gives_up(
     assert not h.link.is_running
     assert paho.loop_stopped
     connected, error = h.events[-1]
-    assert connected is False and isinstance(error, MqttAuthError)
+    assert connected is False
+    assert isinstance(error, MqttAuthError)
     assert isinstance(h.link.last_error, MqttAuthError)
 
 
@@ -605,8 +618,10 @@ async def test_graceful_disconnect(http: FakeSession, secrets: CloudSecrets) -> 
     await h.link.disconnect()
     paho = h.paho
     assert paho.unsubscribed == [list(printer_topics(MACHINE_TYPE, PRINTER_KEY))]
-    assert paho.disconnects == 1 and paho.loop_stopped
-    assert not h.link.is_running and not h.link.is_connected
+    assert paho.disconnects == 1
+    assert paho.loop_stopped
+    assert not h.link.is_running
+    assert not h.link.is_connected
     assert h.events == [(True, None)]  # a deliberate stop is not reported
     await h.link.disconnect()  # nothing to do
     assert h.link.printers == frozenset({PRINTER_KEY})
@@ -657,7 +672,8 @@ async def test_connect_while_reconnecting_waits(
     await settle()
     h.paho.fire_connack()
     await task
-    assert h.link.is_connected and len(h.clients) == 1
+    assert h.link.is_connected
+    assert len(h.clients) == 1
 
 
 async def test_late_callbacks_after_stop_are_ignored(
