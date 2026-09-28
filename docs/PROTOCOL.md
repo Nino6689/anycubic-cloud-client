@@ -565,7 +565,7 @@ body: {"device_type": "pcf", "access_token": "<access token>"}
 | Where | Retry |
 |---|---|
 | Any single request | **none** in the library |
-| Token exchange | 2 attempts, 2 s apart, only on an empty-`data` answer; then the web fallback once (§2.8) |
+| Token exchange | 2 attempts, 2 s apart, only on an empty-`data` answer; then the web fallback once (§2.8). **Required in 3.0:** a rate-limit answer (§4.3) is retried after the cooldown (≥ 5 s) and never counts as a refusal. A client created right after a sign-in should reuse that sign-in's tokens rather than exchange again. |
 | Displaced user token | once per check: drop the user token and exchange again (§2.6.5 step 5) |
 | Stored tokens refused at setup | once: rebuild from the entry's token alone (§2.6.5 step 6) |
 | Setup, on the "server maintenance / request error" class | 3 retries, 10 s apart (4 attempts), then a **terminal** setup error. BEHAVIOUR §5.7 describes this as "retried 3 times". |
@@ -643,6 +643,8 @@ printer-rename and firmware-update answers are read for `name`,
 - **2.x never reads `code` on HTTP answers.** It judges success only by whether
   `data` has the expected content: a user object with `id`, a `token`, a
   `msgid`, and so on.
+- **Measured 2026-09-28:** the token exchange answers `code` **1** with `msg`
+  `Login successful` on success, and `code` **0** when refused (including the rate limit, §4.3).
 - Anycubic's own Slicer Next UI treats **`code == 1`** as success on the
   send-order call (order 1001, camera). The camera answer's success message is
   `Operation successful`. It is not verified that 1 means success on every
@@ -658,6 +660,7 @@ printer-rename and firmware-update answers are read for `name`,
 | token exchange; also any call with a bad token | `msg` = `User does not exist` | the token is invalid in *any* way (§2.1). Not about the account. | credentials rejected |
 | token exchange | `msg` = `Login information has expired. Please login again.` | the session behind the access token was revoked on the server (§5.1) | credentials rejected. A new token is needed. |
 | userInfo | `data` null, or no `data.id` | the token was not accepted | credentials rejected |
+| token exchange | `code` **0**, `msg` = `请求过于频繁。请稍后再试` ("requests too frequent, try again later"), no `data` | **rate limit.** Measured on 2026-09-28: a second exchange of the same access token within about 3 s of a successful one is refused like this; after 5 s or more it succeeds. **Not a credentials verdict.** Wait at least 5 s (10 s recommended) and try again. Never fall back to web mode and never ask for re-authentication because of it. 2.x treats it as a refusal, which can end in a false re-auth. | **transient** |
 | userInfo, printer info | `msg` = `request error` | server maintenance or rate limiting (the only rate-limit signal known) | **transient** |
 | send order | `data` null and `msg` = `No file found` | the cloud file does not exist | file-not-found error |
 | send order | `data` null, any other `msg` | the order was refused. The `msg` is shown to the user. | action error |
@@ -1165,7 +1168,7 @@ Captured (firmware 2.0.1.9, printer with an ACE and no holder — hass-anycubic
 
 ##### 2.3.9 `type_function_ids` (capabilities)
 
-Array of integer function ids. 2.x tests membership:
+Array of integer function ids. 2.x tests membership. The names below are **compatibility data**: 2.x shows exactly these strings in the `supported_functions` attribute (BEH §2.14), so 3.0 must produce them unchanged.
 
 | Id | Name | Id | Name |
 |---|---|---|---|

@@ -49,8 +49,10 @@ nobody needs to read that package's source for this.
 | Date | Team | Session | Inputs given | Outputs | Did not read the excluded repos |
 |---|---|---|---|---|---|
 | 2026-09-28 | Specification | Claude (local, Nino's machine) and four local helper sessions | The 2.x integration `hass-anycubic` 2.9.4 and library `anycubic-cloud-api` 0.4.32 source, tests and captured fixtures; field notes | `PROTOCOL.md` (Parts A–D), `INTEGRATION-SPEC.md`, this file, `README.md`, `LICENSE`, CI workflows. Credentials named by role only; scanned against the real values: no match | n/a — specification team |
+| 2026-09-28 | Specification | Claude (local) | PR #1 @ `e8f7ad8`, black-box against a real account; the 2.x code for the light-type fact | `ACCEPTANCE.md` (L1, L2); PROTOCOL A §3.7, §4.2 and §4.3 (the rate limit, success code 1), B §2.3.9 (the function names are compatibility data) | n/a — specification team |
 
 ## Similarity checks
 
 | Date | Artefact | Compared against | Longest identical run (non-blank, non-comment lines) | Result |
 |---|---|---|---|---|
+| 2026-09-28 | `src/`, `tests/` @ `e8f7ad8` | 2.x integration, 2.x library, WaresWichall | 25: Agora join-message fields. The same block is in the MIT `homeassistant_petkit` `agora_websocket.py`, which both 3.0 and 2.x adapted with credit. 23: the function-id names, which are compatibility data (BEH §2.14 `supported_functions`) given in PROTOCOL B §2.3.9. 6: SDP field names from the same MIT source. 5: order names from the spec's order table. 4: dataclass field names | Clean |
