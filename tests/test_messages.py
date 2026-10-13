@@ -631,3 +631,91 @@ def test_parser_errors_do_not_escape(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("anycubic_cloud_client.messages.parse_message", broken)
     message = parse(mqtt("fan", "auto", "done", {}))
     assert not message.understood
+
+
+# -- Beta 2 field reports ------------------------------------------------------------------
+
+# D5: a Kobra X progress report names no task; the S1 adds a few more fields.
+KOBRA_X_PROGRESS: dict[str, Any] = {
+    "curr_layer": 4,
+    "file_root_path": "/useremain/app/gk/gcodes",
+    "filename": "cube.gcode",
+    "filetype": 1,
+    "print_time": 9,
+    "progress": 71,
+    "remain_time": 30,
+    "settings": {"light": 0},
+    "supplies_usage": 150,
+    "total_layers": 5,
+}
+S1_PROGRESS_EXTRAS: dict[str, Any] = {
+    "display_filename": "cube",
+    "origin3mf": "cube.3mf",
+    "source_info": {"source": "local"},
+    "temp_gcode": "/useremain/tmp/cube.gcode",
+}
+
+
+@pytest.mark.parametrize("extras", [{}, S1_PROGRESS_EXTRAS])
+def test_untasked_progress_update(
+    extras: dict[str, Any], caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level("DEBUG")
+    message = parse(mqtt("print", "update", "updated", KOBRA_X_PROGRESS | extras))
+    assert message.understood
+    update = message.update
+    assert isinstance(update, PrintUpdate)
+    assert update.task_id is None
+    assert not update.task_id_present
+    assert update.applies_to(614707220)
+    assert update.job is not None
+    assert (update.job.progress, update.job.current_layer) == (71, 4)
+    assert (update.job.total_layers, update.job.supplies_usage) == (5, 150)
+    assert (update.job.print_time, update.job.remain_time) == (9, 30)
+    assert update.job.filename == "cube.gcode"
+    assert update.channel_no is None
+    assert not [r for r in caplog.records if r.levelno >= 30]
+
+
+def test_channel_no_update() -> None:
+    # D4: the Kobra X reports filament changes as a bare channel number.
+    data = {"channel_no": 3, "settings": {"light": 0}}
+    update = _print("update", "updated", data)
+    assert update.channel_no == 3
+    assert update.job is not None
+    assert update.job.progress is None
+    assert _print("update", "updated").channel_no is None
+    assert _print("update", "updated").job is None
+
+
+@pytest.mark.parametrize(
+    ("envelope", "data", "expected"),
+    [
+        ({"code": 11505, "state": "failed"}, {}, (11505, "done")),
+        ({"code": 200, "state": "failed"}, {"code": 11505}, (11505, "done")),
+        ({"state": "failed"}, {"code": 11505, "msg": "too hot"}, (11505, "too hot")),
+        ({"code": 200, "state": "success"}, {"code": 11505}, None),
+        ({"code": 200, "state": "failed"}, {"code": 200}, None),
+        ({"code": 200, "state": "failed"}, {"code": True}, None),
+    ],
+)
+def test_refused_ace_order_fault(
+    envelope: dict[str, Any], data: dict[str, Any], expected: tuple[int, str] | None
+) -> None:
+    # D2: a refused drying start carries its code on the envelope or in data.
+    raw = mqtt("multiColorBox", "setDry", "success", data) | envelope
+    message = parse(raw)
+    fault = message.fault
+    assert (None if fault is None else (fault.code, fault.message)) == expected
+
+
+def test_data_code_counts_only_for_ace_replies() -> None:
+    raw = mqtt("print", "stop", "failed", {"code": 11505, "taskid": "5"})
+    assert parse(raw).fault is None
+
+
+def test_malformed_ace_state_does_not_break_parsing() -> None:
+    raw = mqtt("multiColorBox", "setDry", "x", {"code": 11505}) | {"state": ["bad"]}
+    message = parse(raw)
+    assert message.fault is not None
+    assert message.fault.code == 11505

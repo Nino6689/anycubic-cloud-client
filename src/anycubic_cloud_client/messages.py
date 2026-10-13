@@ -160,6 +160,10 @@ class PrintUpdate:
     """Job targets from an ``updated`` body, only when both are present."""
     target_hotbed_temp: float | int | None = None
     slice_param: SliceParam | None = None
+    channel_no: int | None = None
+    """``data.channel_no`` of an ``updated`` report: the filament channel now
+    feeding the printer, as the printer numbers it (Kobra X; Beta 2, D4).
+    Printer level: applies whatever the task."""
 
     def applies_to(self, job_id: int | None) -> bool:
         """Whether the job fields belong to the known job ``job_id``.
@@ -331,10 +335,31 @@ def decode_payload(
     return cast("Mapping[str, Any]", decoded) if isinstance(decoded, Mapping) else None
 
 
+def _is_fault_code(code: object) -> bool:
+    return isinstance(code, int) and not isinstance(code, bool) and code not in OK_CODES
+
+
 def _fault(message: Mapping[str, Any]) -> Fault | None:
+    """The envelope's fault code, or a refused ACE order's code in ``data``.
+
+    An ACE that refuses an order (e.g. ``setDry`` above its drying limit)
+    may answer with an OK or missing envelope ``code`` and the fault code in
+    ``data.code`` (Beta 2, D2). That inner code counts only on a
+    ``multiColorBox`` reply that is not a success.
+    """
     code = message.get("code")
-    if isinstance(code, int) and not isinstance(code, bool) and code not in OK_CODES:
-        return Fault(code, as_str(message.get("msg")))
+    if _is_fault_code(code):
+        return Fault(cast("int", code), as_str(message.get("msg")))
+    if (
+        message.get("type") != "multiColorBox"
+        or as_str(message.get("state")) in COMPLETED
+    ):
+        return None
+    body = as_map(message.get("data"))
+    inner = body.get("code")
+    if _is_fault_code(inner):
+        msg = as_str(body.get("msg")) or as_str(message.get("msg"))
+        return Fault(cast("int", inner), msg)
     return None
 
 
@@ -548,6 +573,9 @@ def _print_update(
             state=state,
             task_id=task_id,
             task_id_present=present,
+            # Progress fields; a Kobra X names no task here (Beta 2, D5).
+            job=LanJob.from_data(body) if body else None,
+            channel_no=as_int(body.get("channel_no")),
             nozzle_temp=nozzle if both else None,
             hotbed_temp=bed if both else None,
             fan_speed_pct=as_number(settings.get("fan_speed_pct")),
