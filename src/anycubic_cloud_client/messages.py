@@ -350,7 +350,10 @@ def _fault(message: Mapping[str, Any]) -> Fault | None:
     code = message.get("code")
     if _is_fault_code(code):
         return Fault(cast("int", code), as_str(message.get("msg")))
-    if message.get("type") != "multiColorBox" or message.get("state") in COMPLETED:
+    if (
+        message.get("type") != "multiColorBox"
+        or as_str(message.get("state")) in COMPLETED
+    ):
         return None
     body = as_map(message.get("data"))
     inner = body.get("code")

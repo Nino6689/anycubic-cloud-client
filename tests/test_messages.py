@@ -712,3 +712,10 @@ def test_refused_ace_order_fault(
 def test_data_code_counts_only_for_ace_replies() -> None:
     raw = mqtt("print", "stop", "failed", {"code": 11505, "taskid": "5"})
     assert parse(raw).fault is None
+
+
+def test_malformed_ace_state_does_not_break_parsing() -> None:
+    raw = mqtt("multiColorBox", "setDry", "x", {"code": 11505}) | {"state": ["bad"]}
+    message = parse(raw)
+    assert message.fault is not None
+    assert message.fault.code == 11505
