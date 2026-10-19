@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from enum import IntEnum, StrEnum
@@ -81,6 +82,22 @@ class WorkStatus(IntEnum):
 
     FREE = 1
     BUSY = 2
+
+
+class FilamentStep(StrEnum):
+    """A filament-change step a ``print``/``start`` report announces during a
+    job (Beta 3, D10). None of them changes the job."""
+
+    PRINTER_FEEDING = "extfilbox_filament_feeding"
+    """The printer's own feeder feeds ``channel_no``; no ``unit_no``."""
+    PRINTER_UNFEEDING = "extfilbox_filament_unfeeding"
+    ACE_FEEDING = "ace_filament_feeding"
+    """An ACE feeds ``channel_no``; ``unit_no`` names the unit."""
+    NOZZLE_PURGING = "nozzle_purging"
+
+    @property
+    def is_feeding(self) -> bool:
+        return self in (FilamentStep.PRINTER_FEEDING, FilamentStep.ACE_FEEDING)
 
 
 class JobStatus(IntEnum):
@@ -161,9 +178,26 @@ class PrintUpdate:
     target_hotbed_temp: float | int | None = None
     slice_param: SliceParam | None = None
     channel_no: int | None = None
-    """``data.channel_no`` of an ``updated`` report: the filament channel now
-    feeding the printer, as the printer numbers it (Kobra X; Beta 2, D4).
-    Printer level: applies whatever the task."""
+    """``data.channel_no`` of an ``updated`` report or a filament step: the
+    filament channel, counted from 1 within its box (Beta 3, D10; the
+    box is not named by an ``updated`` report, Beta 2 D4). Printer level:
+    applies whatever the task."""
+    filament_step: FilamentStep | None = None
+    """The filament-change step this report announces (D10), if any."""
+    unit_no: int | None = None
+    """``data.unit_no`` of an ACE feeding step: the unit, as reported (D10)."""
+
+    @property
+    def feeding_channel(self) -> int | None:
+        """The channel this report says now feeds the printer, if it says so.
+
+        An ``updated`` report's ``channel_no`` and a feeding step's; unfeed
+        and purge steps announce none (D10).
+        """
+        if self.filament_step is not None and not self.filament_step.is_feeding:
+            return None
+        channel = self.channel_no
+        return channel if channel is not None and channel >= 1 else None
 
     def applies_to(self, job_id: int | None) -> bool:
         """Whether the job fields belong to the known job ``job_id``.
@@ -208,6 +242,18 @@ class ExternalHolderUpdate:
     loaded: bool | None = None
     status_type: int | None = None
     current_status: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CurrentFilamentUpdate:
+    """``extfilbox``/``auto``: ``current_filament`` ``"<box>-<slot>"`` (D13).
+
+    Both count from 0. ``None`` when the reading is ``""`` (filament
+    retracted for levelling or wiping) or malformed: keep the last slot.
+    """
+
+    box: int | None = None
+    slot: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,6 +311,7 @@ type CloudUpdate = (
     | AxisMoveUpdate
     | AceLoadedSlotUpdate
     | ExternalHolderUpdate
+    | CurrentFilamentUpdate
     | FileListUpdate
     | FileDeletedUpdate
     | FirmwareReport
@@ -460,7 +507,7 @@ def _lan_understood(kind: str, action: str | None, state: str | None) -> bool:
         case "multiColorBox":
             return action in ACE_ACTIONS and state in COMPLETED
         case "extfilbox":
-            return action == "reportInfo" and state in COMPLETED
+            return action in ("reportInfo", "auto") and state in COMPLETED
     return True  # aiSettings and info: any action and state
 
 
@@ -475,6 +522,10 @@ def _lan_message(
         message["data"], update = _normalise_ace(action, data)
     elif kind == "axis" and action == "move":
         update = AxisMoveUpdate(state or "")
+    elif kind == "extfilbox" and action == "auto":
+        # The printer's loaded filament, not the holder (D13): the holder
+        # report is left alone, so no LAN report is built from it.
+        return _replace(base, update=_current_filament(as_map(data)))
     elif kind == "extfilbox":
         body = as_map(data)
         update = ExternalHolderUpdate(
@@ -487,6 +538,18 @@ def _lan_message(
     # The LAN envelope keeps the topic: hand it the redacted one.
     report = parse_message(message, redact_topic(base.topic))
     return _replace(base, report=report, update=update)
+
+
+_CURRENT_FILAMENT = re.compile(r"([0-9]+)-([0-9]+)")
+
+
+def _current_filament(body: Mapping[str, Any]) -> CurrentFilamentUpdate:
+    value = as_str(body.get("current_filament"))
+    match = _CURRENT_FILAMENT.fullmatch(value.strip()) if value else None
+    if match is None:
+        return CurrentFilamentUpdate()
+    box, slot = (int(group) for group in match.groups())
+    return CurrentFilamentUpdate(box, slot)
 
 
 def _normalise_ace(action: str | None, data: object) -> tuple[Any, CloudUpdate | None]:
@@ -526,6 +589,9 @@ _STATUS_ROWS: dict[tuple[str, str], tuple[WorkStatus, JobStatus, int | None]] = 
     ("start", "failed"): (WorkStatus.FREE, JobStatus.CANCELLED, None),
     ("stop", "failed"): (WorkStatus.FREE, JobStatus.CANCELLED, None),
 }
+
+
+_FILAMENT_STEPS = frozenset(step.value for step in FilamentStep)
 
 
 def _task_id(body: Mapping[str, Any]) -> tuple[int | None, bool]:
@@ -583,6 +649,17 @@ def _print_update(
             print_speed_mode=as_int(settings.get("print_speed_mode")),
             target_nozzle_temp=t_nozzle if both_targets else None,
             target_hotbed_temp=t_bed if both_targets else None,
+        )
+    if action == "start" and state in _FILAMENT_STEPS:
+        # Not a job state, and no job field changes (D10).
+        return PrintUpdate(
+            action=action,
+            state=state,
+            task_id=task_id,
+            task_id_present=present,
+            channel_no=as_int(body.get("channel_no")),
+            filament_step=FilamentStep(state),
+            unit_no=as_int(body.get("unit_no")),
         )
     if action == "getSliceParam" and state == "done":
         return PrintUpdate(
