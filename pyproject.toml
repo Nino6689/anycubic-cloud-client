@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "anycubic-cloud-client"
-version = "0.1.1"
+version = "0.1.2"
 description = "Async client for the Anycubic cloud: sign-in, HTTP API, cloud MQTT, files, printing and camera signalling."
 readme = "README.md"
 license = "MIT"
@@ -25,7 +25,7 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp>=3.10",
-    "anycubic-lan>=0.1.1",
+    "anycubic-lan>=0.1.2",
     "bcrypt>=4.0",
     "cryptography>=43",
     "paho-mqtt>=2.1",
