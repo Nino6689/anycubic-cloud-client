@@ -620,6 +620,8 @@ class PrinterDetail:
     machine_data: Mapping[str, Any] = field(default=_EMPTY, repr=False)
     nozzle_temp: Number | None = None
     hotbed_temp: Number | None = None
+    chamber_temp: Number | None = None
+    """``parameter.curr_chamber_temp``; ``0`` without a sensor (Beta 4, D21)."""
     type_function_ids: tuple[int, ...] = ()
     firmware: FirmwareInfo | None = None
     ace_firmware: tuple[FirmwareInfo, ...] = ()
@@ -651,6 +653,7 @@ class PrinterDetail:
             machine_data=as_map(data.get("machine_data")),
             nozzle_temp=as_number(parameter.get("curr_nozzle_temp")),
             hotbed_temp=as_number(parameter.get("curr_hotbed_temp")),
+            chamber_temp=as_number(parameter.get("curr_chamber_temp")),
             type_function_ids=_int_tuple(data.get("type_function_ids")),
             firmware=FirmwareInfo.from_data(version)
             if isinstance(version, Mapping)
