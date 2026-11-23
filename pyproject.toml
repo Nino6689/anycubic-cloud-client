@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "anycubic-cloud-client"
-version = "0.1.3"
+version = "0.1.4"
 description = "Async client for the Anycubic cloud: sign-in, HTTP API, cloud MQTT, files, printing and camera signalling."
 readme = "README.md"
 license = "MIT"

@@ -1218,3 +1218,47 @@ class CameraCredentials:
             msgid=as_text(data.get("msgid")),
             raw=data,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class KinesisCredentials:
+    """Temporary AWS credentials for the Kinesis Video camera (Beta 6, D27).
+
+    The camera-open order's ``data.token`` block, sent to accounts whose
+    camera streams over Amazon Kinesis Video Streams WebRTC instead of
+    Agora: ``region``, ``tmpSecretId`` (access key id), ``tmpSecretKey``,
+    ``sessionToken`` and ``expiration``. Single use: never cache them. The
+    ``repr`` shows no secret.
+    """
+
+    region: str
+    access_key_id: str
+    secret_access_key: str
+    session_token: str
+    expiration: int | None = None
+
+    def __repr__(self) -> str:
+        return (
+            f"KinesisCredentials(region={self.region!r}, expiration={self.expiration})"
+        )
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> KinesisCredentials | None:
+        """``None`` when the ``token`` block is missing or any of its four
+        credential fields is."""
+        block = data.get("token")
+        if not isinstance(block, Mapping):
+            return None
+        region = as_text(block.get("region"))
+        key_id = as_text(block.get("tmpSecretId"))
+        secret = as_text(block.get("tmpSecretKey"))
+        session = as_text(block.get("sessionToken"))
+        if region is None or key_id is None or secret is None or session is None:
+            return None
+        return cls(
+            region=region.strip(),
+            access_key_id=key_id,
+            secret_access_key=secret,
+            session_token=session,
+            expiration=as_int(block.get("expiration")),
+        )

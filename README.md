@@ -173,6 +173,12 @@ arrive; the printer id is tied to its key by `get_printers()` or
   key from its Web SDK (`agora-rtc-sdk-ng` 4.24.0, PROTOCOL D §1.7) as the
   default, so a caller passes nothing. `sdk_public_key_pem` stays as an
   optional override ([Q6](docs/QUESTIONS.md)).
+  Accounts whose camera-open order returns temporary AWS credentials instead
+  (`open_camera_stream` → `KinesisCredentials`) are served by
+  `KinesisViewerSession`, an Amazon Kinesis Video Streams WebRTC **viewer**
+  signalling client with its own SigV4 signing (`sigv4.py`), written from
+  AWS's public documentation. The printer's `video` reports are parsed as
+  `VideoUpdate`.
 
 ## Credits
 
