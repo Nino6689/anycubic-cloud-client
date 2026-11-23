@@ -255,6 +255,19 @@ async def test_agora_wins_over_token(http: FakeSession, secrets: CloudSecrets) -
     assert isinstance(credentials, CameraCredentials)
 
 
+async def test_incomplete_agora_block_is_not_kinesis(
+    http: FakeSession, secrets: CloudSecrets
+) -> None:
+    """An Agora block decides even when incomplete: no credentials."""
+    reply = envelope(
+        {"msgid": "m", "shengwang": {"appid": "A"}, "token": dict(TOKEN_BLOCK)}
+    )
+    http.add("POST", ORDER, reply)
+    c = make_client(http, secrets, mode=AuthMode.WEB)
+    with pytest.raises(NoCameraCredentialsError, match="incomplete"):
+        await c.open_camera_stream(5)
+
+
 async def test_token_only_is_kinesis(http: FakeSession, secrets: CloudSecrets) -> None:
     http.add("POST", ORDER, kvs_reply())
     c = make_client(http, secrets, user_token="OLD", access_token="access")
@@ -840,6 +853,61 @@ async def test_send_failure_fails_the_stream() -> None:
     await session.start(OFFER)
     await asyncio.wait_for(recorder.done.wait(), 2)
     assert recorder.errors == ["Could not send the camera offer"]
+
+
+class SlowConnect(FakeSession):
+    """ws_connect waits until the test lets it finish."""
+
+    def __init__(self, socket: FakeKvsSocket) -> None:
+        super().__init__()
+        self.socket = socket
+        self.entered = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def ws_connect(self, url: str, **kwargs: Any) -> Any:
+        self.entered.set()
+        await self.release.wait()
+        return self.socket
+
+
+def slow_http(socket: FakeKvsSocket) -> SlowConnect:
+    http = SlowConnect(socket)
+    base = kvs_http()
+    http.routes = base.routes
+    return http
+
+
+async def test_close_while_opening_never_installs_the_socket() -> None:
+    socket = FakeKvsSocket()
+    http = slow_http(socket)
+    recorder = Recorder()
+    session = kvs_session(http, recorder, video_state="pushStarted")
+    task = asyncio.create_task(session.start(OFFER))
+    await asyncio.wait_for(http.entered.wait(), 2)
+    await asyncio.wait_for(session.close(), 2)
+    http.release.set()
+    with pytest.raises(KinesisError, match="closed while it opened"):
+        await task
+    assert socket.closed
+    assert socket.sent == []
+    assert recorder.errors == []
+    await asyncio.wait_for(session.close(), 2)  # does not hang
+
+
+async def test_printer_failure_while_opening_reported_once() -> None:
+    socket = FakeKvsSocket()
+    http = slow_http(socket)
+    recorder = Recorder()
+    session = kvs_session(http, recorder)
+    task = asyncio.create_task(session.start(OFFER))
+    await asyncio.wait_for(http.entered.wait(), 2)
+    session.notify_video_state("initFailed")
+    http.release.set()
+    with pytest.raises(KinesisError, match="initFailed"):
+        await task
+    await asyncio.sleep(0.02)
+    assert recorder.errors == []  # start() reported it; on_error not too
+    assert socket.closed
 
 
 async def test_aws_refusal_is_aws_message() -> None:

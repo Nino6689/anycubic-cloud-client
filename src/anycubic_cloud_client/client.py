@@ -1082,9 +1082,10 @@ class AnycubicCloudClient:
         returned = any(
             isinstance(data.get(key), Mapping) for key in ("shengwang", "token")
         )
-        agora = CameraCredentials.from_data(data)
-        if agora is not None:
-            return agora, True
+        if isinstance(data.get("shengwang"), Mapping):
+            # An Agora block decides, complete or not: Kinesis Video only
+            # when the reply has no Agora block at all (D27).
+            return CameraCredentials.from_data(data), True
         return KinesisCredentials.from_data(data), returned
 
     async def open_camera_stream(

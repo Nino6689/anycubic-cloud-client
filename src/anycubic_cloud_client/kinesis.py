@@ -221,6 +221,7 @@ class KinesisViewerSession:
         self._ws: aiohttp.ClientWebSocketResponse | None = None
         self._tasks: set[asyncio.Task[None]] = set()
         self._started = False
+        self._opened = False
         self._closed = False
         self._offer_sent = False
         self._answered = asyncio.Event()
@@ -257,7 +258,8 @@ class KinesisViewerSession:
             self._pushing.set()
         elif state in FAILED_STATES:
             self._pushing.set()  # stop waiting: the driver sees the failure
-            if self._started and not self._closed:
+            # While start() runs it reports the failure itself, once.
+            if self._opened and not self._closed:
                 self._spawn(self._fail(f"The printer reported {state}"))
 
     def add_ice_candidate(self, candidate: IceCandidate) -> None:
@@ -296,7 +298,7 @@ class KinesisViewerSession:
                 now=self._clock() if self._clock else None,
             )
             try:
-                self._ws = await self._http.ws_connect(url, heartbeat=None)
+                ws = await self._http.ws_connect(url, heartbeat=None)
             except aiohttp.WSServerHandshakeError as err:
                 raise KinesisError(
                     f"AWS refused the camera's signalling connection ({err.status})"
@@ -309,10 +311,18 @@ class KinesisViewerSession:
         except KinesisError:
             await self._finish("failed")
             raise
+        if self.closed:
+            # Closed while opening: never install the socket (no reader
+            # would ever end, and close() has already run).
+            with contextlib.suppress(aiohttp.ClientError, OSError):
+                await ws.close()
+            raise KinesisError("The camera session was closed while it opened")
+        self._ws = ws
         if self._video_state in FAILED_STATES:
             await self._finish("failed")
             raise KinesisError(f"The printer reported {self._video_state}")
-        self._spawn(self._read_loop(self._ws))
+        self._opened = True
+        self._spawn(self._read_loop(ws))
         self._spawn(self._drive(offer_sdp))
 
     async def close(self) -> None:
