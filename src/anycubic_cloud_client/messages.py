@@ -296,6 +296,29 @@ class FirmwareReport:
     install_progress: int | None = None
 
 
+#: The printer's camera states (Beta 6, D28): ``initSuccess`` then
+#: ``pushStarted`` once it streams; ``pushStopped``, ``pushFailed`` and
+#: ``initFailed`` otherwise.
+VIDEO_STATES = frozenset(
+    {"initSuccess", "pushStarted", "pushStopped", "pushFailed", "initFailed"}
+)
+
+
+@dataclass(frozen=True, slots=True)
+class VideoUpdate:
+    """``video``/``startCapture``: the printer's camera state (Beta 6, D28)."""
+
+    state: str
+
+    @property
+    def pushing(self) -> bool:
+        return self.state == "pushStarted"
+
+    @property
+    def failed(self) -> bool:
+        return self.state in ("initFailed", "pushFailed")
+
+
 @dataclass(frozen=True, slots=True)
 class PrinterEvent:
     """``event``, ``printerevent`` or ``printer_event`` (fault: the envelope code)."""
@@ -316,6 +339,7 @@ type CloudUpdate = (
     | FileDeletedUpdate
     | FirmwareReport
     | PrinterEvent
+    | VideoUpdate
 )
 
 
@@ -489,6 +513,9 @@ def _dispatch(
             report = _firmware_report(info, action, state, body)
             if report is not None:
                 return _replace(base, update=report)
+        case "video":
+            if action == "startCapture" and state in VIDEO_STATES:
+                return _replace(base, update=VideoUpdate(state))
         case _ if kind in EVENT_KINDS:
             return _replace(base, update=PrinterEvent(body))
         case _ if kind in LAN_KINDS:

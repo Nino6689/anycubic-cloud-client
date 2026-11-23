@@ -142,3 +142,11 @@ class MqttNotConnectedError(MqttError):
 
 class AgoraError(AnycubicCloudError):
     """The Agora camera signalling failed."""
+
+
+class KinesisError(AnycubicCloudError):
+    """The Amazon Kinesis Video camera signalling failed (Beta 6, D27).
+
+    The message is safe to show: it never carries the temporary AWS
+    credentials.
+    """

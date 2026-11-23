@@ -36,6 +36,7 @@ from .errors import (
     CloudFileNotFoundError,
     CredentialsRejectedError,
     GcodeMetadataError,
+    KinesisError,
     MqttAuthError,
     MqttConnectionError,
     MqttError,
@@ -54,6 +55,7 @@ from .errors import (
     UploadError,
 )
 from .firmware import FirmwareProgress
+from .kinesis import IceCandidate, KinesisViewerSession
 from .messages import (
     AceLoadedSlotUpdate,
     AxisMoveUpdate,
@@ -71,6 +73,7 @@ from .messages import (
     OnlineUpdate,
     PrinterEvent,
     PrintUpdate,
+    VideoUpdate,
     WorkStatus,
     WorkStatusUpdate,
     parse_cloud_message,
@@ -90,6 +93,7 @@ from .models import (
     Job,
     JobDetail,
     JobSettings,
+    KinesisCredentials,
     PaintInfo,
     PrinterDetail,
     PrinterFile,
@@ -129,6 +133,7 @@ from .printing import (
     parse_gcode_header,
 )
 from .regions import AuthMode, Region, RegionEndpoints
+from .sigv4 import AwsCredentials, presign_url, sign_request
 from .tokens import (
     SignatureCheck,
     SignatureStatus,
@@ -141,7 +146,7 @@ from .tokens import (
     verify_token_signature,
 )
 
-__version__ = "0.1.3"
+__version__ = "0.1.4"
 
 __all__ = [
     "Account",
@@ -154,6 +159,7 @@ __all__ = [
     "AnycubicCloudError",
     "ApiResponse",
     "AuthMode",
+    "AwsCredentials",
     "Axis",
     "AxisMoveUpdate",
     "BindingUpdate",
@@ -183,10 +189,14 @@ __all__ = [
     "GcodeColor",
     "GcodeInfo",
     "GcodeMetadataError",
+    "IceCandidate",
     "Job",
     "JobDetail",
     "JobSettings",
     "JobStatus",
+    "KinesisCredentials",
+    "KinesisError",
+    "KinesisViewerSession",
     "MoveType",
     "MqttAuthError",
     "MqttConnectionError",
@@ -229,6 +239,7 @@ __all__ = [
     "TokenState",
     "UnexpectedResponseError",
     "UploadError",
+    "VideoUpdate",
     "WorkStatus",
     "WorkStatusUpdate",
     "__version__",
@@ -244,11 +255,13 @@ __all__ = [
     "parse_cloud_message",
     "parse_gcode_header",
     "parse_topic",
+    "presign_url",
     "printer_topics",
     "redact_topic",
     "select_latest_job",
     "sign_in_any",
     "sign_in_order",
+    "sign_request",
     "store_is_stale",
     "trim_signature",
     "user_topics",

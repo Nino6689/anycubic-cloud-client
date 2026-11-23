@@ -42,6 +42,7 @@ from .models import (
     GcodeInfo,
     Job,
     JobDetail,
+    KinesisCredentials,
     PaintInfo,
     PrinterDetail,
     PrinterModel,
@@ -123,6 +124,19 @@ NO_CAMERA_MESSAGE = (
     "No camera credentials: the printer has no camera, or another Anycubic "
     "session (slicer or phone app) holds the account"
 )
+
+INCOMPLETE_CAMERA_MESSAGE = (
+    "The camera-open order returned camera credentials that are incomplete"
+)
+KINESIS_ONLY_MESSAGE = (
+    "This camera streams over Amazon Kinesis Video, not Agora: use open_camera_stream"
+)
+
+
+def _no_camera(returned: bool) -> str:
+    """Say honestly why there are no credentials (Beta 6, D27)."""
+    return INCOMPLETE_CAMERA_MESSAGE if returned else NO_CAMERA_MESSAGE
+
 
 type Params = Mapping[str, object]
 
@@ -1050,22 +1064,44 @@ class AnycubicCloudClient:
 
     # -- camera (PROTOCOL D §1) -------------------------------------------------
 
-    async def _camera_order(self, printer_id: int) -> CameraCredentials | None:
+    async def _camera_order(
+        self, printer_id: int
+    ) -> tuple[CameraCredentials | KinesisCredentials | None, bool]:
+        """One camera-open order: its usable credentials, and whether any
+        credentials block came back at all (Beta 6, D27).
+
+        An Agora (``shengwang``) block wins over a ``token`` block; a
+        ``token`` block counts only with all four of its fields.
+        """
         body = build_order_body(int(printer_id), Order.CAMERA_OPEN)
         response = await self.request("POST", "/work/operation/sendOrder", body=body)
-        if not isinstance(response.data, Mapping):
-            return None
-        return CameraCredentials.from_data(response.data)
+        data = response.data
+        if not isinstance(data, Mapping):
+            return None, False
+        # The order's ``token`` is a credentials block only as an object.
+        returned = any(
+            isinstance(data.get(key), Mapping) for key in ("shengwang", "token")
+        )
+        agora = CameraCredentials.from_data(data)
+        if agora is not None:
+            return agora, True
+        return KinesisCredentials.from_data(data), returned
 
-    async def open_camera(self, printer_id: int) -> CameraCredentials:
-        """Order 1001 → single-use Agora credentials (PROTOCOL D §1.3-§1.5).
+    async def open_camera_stream(
+        self, printer_id: int
+    ) -> CameraCredentials | KinesisCredentials:
+        """Order 1001 → single-use camera credentials (PROTOCOL D §1.3-§1.5;
+        Beta 6, D27).
 
-        When the credentials block is missing another session probably holds
-        the camera: with a slicer access token the user token is dropped, a
-        fresh exchange is forced and the order is sent once more. Never cache
-        the result.
+        Agora credentials when the reply has a ``shengwang`` block (even if
+        it also has a ``token`` block); otherwise temporary AWS credentials
+        for Kinesis Video when it has a complete ``token`` block. When
+        neither is usable another session may hold the camera: with a slicer
+        access token the user token is dropped, a fresh exchange is forced
+        and the order is sent once more. No retry when a usable block came
+        back. Never cache the result.
         """
-        credentials = await self._camera_order(printer_id)
+        credentials, returned = await self._camera_order(printer_id)
         if credentials is not None:
             return credentials
         if self._auth_mode is AuthMode.SLICER and self._access_token:
@@ -1074,11 +1110,24 @@ class AnycubicCloudClient:
             try:
                 await self.check()
             except AnycubicCloudError as err:
-                raise NoCameraCredentialsError(NO_CAMERA_MESSAGE) from err
-            credentials = await self._camera_order(printer_id)
+                raise NoCameraCredentialsError(_no_camera(returned)) from err
+            credentials, again = await self._camera_order(printer_id)
             if credentials is not None:
                 return credentials
-        raise NoCameraCredentialsError(NO_CAMERA_MESSAGE)
+            returned = returned or again
+        raise NoCameraCredentialsError(_no_camera(returned))
+
+    async def open_camera(self, printer_id: int) -> CameraCredentials:
+        """Order 1001 → single-use Agora credentials (PROTOCOL D §1.3-§1.5).
+
+        As :meth:`open_camera_stream`, for callers that only speak Agora: a
+        camera that streams over Kinesis Video raises
+        :class:`NoCameraCredentialsError`.
+        """
+        credentials = await self.open_camera_stream(printer_id)
+        if isinstance(credentials, KinesisCredentials):
+            raise NoCameraCredentialsError(KINESIS_ONLY_MESSAGE)
+        return credentials
 
     # -- cloud files (PROTOCOL B §4, D §3) ------------------------------------
 
